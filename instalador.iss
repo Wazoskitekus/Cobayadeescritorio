@@ -49,6 +49,8 @@ Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: 
 
 [Run]
 Filename: "{app}\Tamacuychi.exe"; Description: "Abrir Tamacuychi ahora"; Flags: nowait postinstall skipifsilent
+; Al actualizar desde la propia cobaya (instalación silenciosa), se vuelve a abrir sola
+Filename: "{app}\Tamacuychi.exe"; Flags: nowait skipifnotsilent
 
 [UninstallRun]
 Filename: "{sys}\taskkill.exe"; Parameters: "/F /IM Tamacuychi.exe"; Flags: runhidden; RunOnceId: "CerrarTamacuychi"

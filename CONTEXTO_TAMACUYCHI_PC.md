@@ -46,6 +46,26 @@ empiezas una conversación nueva, adjunta este archivo y di en qué quieres segu
   limitada y recorte de memoria en Windows. Unos 59 MB (Qt solo ya son unos 50).
 - El instalador cierra la cobaya abierta antes de actualizar.
 
+## Versión 1.2
+
+- **Actualizaciones** (`actualizar.py`): consulta la API de Releases de GitHub al
+  minuto y cada 6 h; descarga el instalador por la API (enlace del asset con
+  `Accept: application/octet-stream`), comprueba tamaño y SHA-256, lo ejecuta con
+  `/VERYSILENT` y el instalador vuelve a abrir la cobaya. La portable cambia su
+  propio .exe (renombra el que está en marcha a `.viejo`). **El repositorio es
+  privado: así no funciona en otros PC; hay que hacerlo público** (o publicar las
+  Releases en otro repositorio público).
+- **Estilos** (`arte.ESTILOS`): tricolor, negra, marrón y espacial (verde con
+  antenas, basada en una foto del usuario). Solo cambian las letras de la paleta;
+  las patas (`F`) y la nariz (`N`) tienen letra propia.
+- **Accesorios** (`arte.ACCESORIOS`): cabeza (sombrero, gorro, corona, lazo),
+  cara (gafas) y cuerpo (mochila, bufanda). Se dibujan con `arte.vestir()` en cada
+  vista (frente, perfil, espalda) buscando dónde está la cabeza.
+- **Sueño**: recarga en 45 min, se cansa en 8 h, se duerme sola por debajo de 30
+  y echa siestas por debajo de 75.
+- Windows bloqueaba el instalador en otro PC por no estar firmado; la solución
+  definitiva es firmarlo (SignPath Foundation es gratis si el repositorio es público).
+
 ## Comportamiento
 
 Clic → popcorning por la pantalla (4–8 saltos de 40–280 px girándose en el

@@ -81,18 +81,40 @@ y pone cara triste:
 Al soltar, el programa siempre le dice al Explorador "copiar", nunca "mover",
 para que el Explorador no borre el original por su cuenta.
 
+## Estilos y accesorios
+
+En el menú (clic derecho): **Estilo** (tricolor, negra, marrón o espacial, con
+antenas) y **Accesorios**: en la cabeza sombrero, gorro de fiesta, corona o lazo;
+en la cara gafas de sol; y en el cuerpo mochila o bufanda. Se pueden combinar uno
+de cada sitio, y se ven de frente, de perfil y de espaldas.
+
+![Estilos y accesorios](art/estilos_y_accesorios.png)
+
+## Actualizaciones
+
+La cobaya mira en GitHub si hay una versión nueva al minuto de arrancar y cada
+6 horas (se puede desactivar: *Buscar actualizaciones sola*). Si la hay, lo dice
+con un bocadillo y aparece **Actualizar a la versión X** en el menú. Al pulsarlo:
+
+- **Instalada**: descarga el instalador, comprueba su huella SHA-256, lo ejecuta
+  en silencio y la cobaya vuelve a abrirse ya actualizada.
+- **Portable**: descarga el .exe nuevo y lo pone en lugar del viejo.
+
+Para que funcione en cualquier PC, **el repositorio tiene que ser público**: si es
+privado, GitHub no deja ver las Releases sin iniciar sesión.
+
 ## Comportamiento propio
 
 Igual que en el firmware:
 
-- **Desgaste**: la saciedad se vacía en 10 h, la felicidad en 8 h (el doble de rápido con hambre y un 50 % más por cada caca) y la energía en 14 h despierta. Durmiendo recarga en 3 h y se despierta sola.
+- **Desgaste**: la saciedad se vacía en 10 h, la felicidad en 8 h (el doble de rápido con hambre y un 50 % más por cada caca) y la energía en 8 h despierta. **Durmiendo recarga en 45 minutos** y se despierta sola.
 - El tiempo con el programa cerrado también cuenta (hasta 12 h).
 - **Cacas**: una cada 30–60 min y otra 10–20 min después de comer, como mucho 4, en el suelo a su lado, con líneas de olor.
 - **Descuidada** (saciedad < 25, felicidad < 30 o 3 cacas o más): cara triste y anda más despacio. Con hambre pide lechuga con un bocadillo.
 - **Cui**: de 1 a 3 silbidos que suben de tono, con bocadillo "cui!". Cada 1–3 min, o cada 15–35 s si tiene hambre.
 - **Anda** sola de un lado a otro por encima de la barra de tareas, mira a los lados y parpadea.
 - Muy contenta, a veces hace *popcorning* sola.
-- Con la energía por debajo de 15 se va a dormir sola.
+- **Duerme mucho**: con la energía por debajo de 30 se va a dormir sola, y por debajo de 75 echa siestas de vez en cuando. Por debajo de 15 no quiere jugar.
 - **Dormir**: aparece el heno, se da la vuelta (frente, perfil, espaldas), camina hacia él haciéndose pequeña y se mete dentro; el heno respira, asoman las orejas y salen zetas.
 
 Se guarda todo en `%APPDATA%\Tamacuychi\estado.json` (Windows),
@@ -109,7 +131,8 @@ tamacuychi/
   papelera.py           comprobaciones y envío seguro a la papelera
   cacas.py              ventanitas de las cacas
   sonido.py             cui, bostezo, ñam... sintetizados a WAV
-  arte.py               pixel art generado por código (sin Qt)
+  actualizar.py         busca, descarga e instala versiones nuevas desde GitHub
+  arte.py               pixel art generado por código, estilos y accesorios (sin Qt)
   sprites.py            escalado entero y nítido, PNG opcionales de sprites/
   config.py             rutas y velocidad del tiempo
 herramientas/

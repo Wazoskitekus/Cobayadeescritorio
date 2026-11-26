@@ -107,6 +107,9 @@ def main():
     from PySide6.QtGui import QActionGroup, QGuiApplication, QIcon
     from PySide6.QtWidgets import QApplication, QInputDialog, QMenu, QSystemTrayIcon
 
+    from . import __version__
+    from .actualizar import Actualizador, limpiar_restos
+    from .arte import ACCESORIOS, ESTILOS
     from .mascota import Mascota
     from .sonido import Sonidos
     from .sprites import Sprites
@@ -117,13 +120,68 @@ def main():
     app.setQuitOnLastWindowClosed(False)
 
     mascota = Mascota()
-    sprites = Sprites()
+    sprites = Sprites(mascota.estilo, mascota.accesorios)
     sprites.dpr = QGuiApplication.primaryScreen().devicePixelRatio()
     sonidos = Sonidos()
     cobaya = Cobaya(mascota, sprites, sonidos)
     icono = QIcon(sprites.icono(2))
     app.setWindowIcon(icono)
     bandeja = None
+    limpiar_restos()
+    act = Actualizador()
+    aviso = {"estado": None, "manual": False}
+
+    def poner_aspecto(estilo=None, hueco=None, valor=None):
+        """Cambia el estilo o un accesorio y vuelve a dibujar la cobaya."""
+        if estilo is not None:
+            mascota.estilo = estilo
+        if hueco is not None:
+            if valor:
+                mascota.accesorios[hueco] = valor
+            else:
+                mascota.accesorios.pop(hueco, None)
+        sprites.configurar(mascota.estilo, mascota.accesorios)
+        nuevo = QIcon(sprites.icono(2))
+        app.setWindowIcon(nuevo)
+        if bandeja is not None:
+            bandeja.setIcon(nuevo)
+        mascota.guardar()
+        if valor or estilo:
+            cobaya.caricia_gratis()
+
+    def buscar_actualizacion(manual=False):
+        if act.ocupado:
+            return
+        aviso["manual"] = manual
+        if manual:
+            cobaya.decir("Mirando...", dur=10)
+        act.buscar()
+
+    def revisar_actualizacion():
+        """Lo que pasa con la actualización, visto desde el hilo de Qt (cada segundo)."""
+        est = act.estado
+        if est == "descargando":
+            cobaya.decir("Descargando %d%%" % int(act.progreso * 100), dur=2)
+            return
+        if est == aviso["estado"]:
+            return
+        aviso["estado"] = est
+        if est == "nueva":
+            v = act.nueva["version"]
+            cobaya.decir("¡Versión %s!" % v, dur=5)
+            if bandeja is not None:
+                bandeja.showMessage("Tamacuychi", "Hay una versión nueva (%s). Clic derecho en "
+                                    "la cobaya → Actualizar." % v, icono)
+        elif est == "al_dia" and aviso["manual"]:
+            cobaya.decir("¡Estoy al día!", dur=3)
+        elif est == "error" and (aviso["manual"] or act.nueva):
+            cobaya.decir("No se pudo :(", dur=3)
+            print("Tamacuychi: actualización:", act.error, file=sys.stderr)
+        elif est == "lista":
+            cobaya.decir("¡Hasta ahora!", dur=3)
+            mascota.guardar()
+            if act.instalar():
+                QTimer.singleShot(400, salir)
 
     def actualizar_nombre():
         nombre = mascota.nombre or "Tamacuychi"
@@ -189,6 +247,31 @@ def main():
         menu.addSeparator()
         accion("✏  Ponerle nombre…" if not m.nombre else "✏  Cambiar el nombre…", poner_nombre)
 
+        est = menu.addMenu("🎨  Estilo")
+        grupo_est = QActionGroup(est)
+        for clave, (nombre, _) in ESTILOS.items():
+            a = est.addAction(nombre)
+            a.setCheckable(True)
+            a.setChecked(m.estilo == clave)
+            a.setActionGroup(grupo_est)
+            a.triggered.connect(lambda _=False, k=clave: poner_aspecto(estilo=k))
+
+        accs = menu.addMenu("🎩  Accesorios")
+        titulos = {"cabeza": "Cabeza", "cara": "Cara", "cuerpo": "Cuerpo"}
+        for hueco, opciones in ACCESORIOS.items():
+            sub = accs.addMenu(titulos[hueco])
+            grupo_acc = QActionGroup(sub)
+            for clave, nombre in [(None, "Nada")] + opciones:
+                a = sub.addAction(nombre)
+                a.setCheckable(True)
+                a.setChecked(m.accesorios.get(hueco) == clave)
+                a.setActionGroup(grupo_acc)
+                a.triggered.connect(lambda _=False, h=hueco, k=clave: poner_aspecto(hueco=h, valor=k))
+        if any(m.accesorios.values()):
+            accs.addSeparator()
+            quitar = accs.addAction("Quitárselo todo")
+            quitar.triggered.connect(lambda: [poner_aspecto(hueco=h) for h in ACCESORIOS])
+
         tam = menu.addMenu("Tamaño")
         grupo = QActionGroup(tam)
         for nombre, e in (("Pequeña", 2), ("Mediana", 3), ("Normal", 4), ("Grande", 5), ("Enorme", 6)):
@@ -221,6 +304,23 @@ def main():
             ini.toggled.connect(cambiar_inicio)
 
         menu.addSeparator()
+        if act.estado == "nueva":
+            accion("⬆  Actualizar a la versión %s" % act.nueva["version"], act.descargar)
+        elif act.estado == "descargando":
+            accion("⬇  Descargando… %d%%" % int(act.progreso * 100), lambda: None, False)
+        else:
+            accion("🔄  Buscar actualizaciones", lambda: buscar_actualizacion(True), not act.ocupado)
+        auto = menu.addAction("Buscar actualizaciones sola")
+        auto.setCheckable(True)
+        auto.setChecked(bool(m.buscar_actualizaciones))
+
+        def cambiar_auto(activo):
+            m.buscar_actualizaciones = activo
+            m.guardar()
+        auto.toggled.connect(cambiar_auto)
+        ver = menu.addAction("Versión " + __version__)
+        ver.setEnabled(False)
+        menu.addSeparator()
         accion("Salir", salir)
         return menu
 
@@ -249,6 +349,19 @@ def main():
 
     if not mascota.nombre_preguntado:
         QTimer.singleShot(1500, poner_nombre)
+
+    # Actualizaciones: al minuto de arrancar y cada 6 horas
+    vigila_act = QTimer()
+    vigila_act.timeout.connect(revisar_actualizacion)
+    vigila_act.start(1000)
+
+    def busqueda_automatica():
+        if mascota.buscar_actualizaciones and act.estado not in ("nueva", "descargando", "lista"):
+            buscar_actualizacion(False)
+    QTimer.singleShot(60 * 1000, busqueda_automatica)
+    cada_6h = QTimer()
+    cada_6h.timeout.connect(busqueda_automatica)
+    cada_6h.start(6 * 3600 * 1000)
 
     # Memoria: al terminar de arrancar y cada 30 minutos
     QTimer.singleShot(8000, liberar_memoria)

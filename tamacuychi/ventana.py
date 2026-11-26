@@ -177,6 +177,12 @@ class Cobaya(QWidget):
         extra = 34 if self.e <= 3 else 0
         self.setFixedSize(WA * self.e, HA * self.e + extra)
 
+    def caricia_gratis(self):
+        """Celebra un cambio de aspecto."""
+        if self.estado not in OCUPADA:
+            self.decir("¡Qué guapa!", dur=2)
+            self._cambiar(FELIZ, 1.6)
+
     def mostrar_barras(self, segundos):
         self._barras_hasta = time.monotonic() + segundos
 
@@ -283,7 +289,10 @@ class Cobaya(QWidget):
             return
         r = random.random()
         feliz = self.m.felicidad > 85 and self.m.energia > 50
-        if feliz and r < 0.05:
+        if self.m.con_sueno and r < 0.06:
+            self.decir("zzz...", dur=1.5)       # siestecita
+            self.dormir()
+        elif feliz and r < 0.11:
             self.popcorn()
         elif r < (0.35 if self.m.descuidada else 0.65):
             self.andar()
@@ -443,7 +452,7 @@ class Cobaya(QWidget):
     def popcorn(self):
         if self.estado in OCUPADA:
             return
-        if self.m.cansada:
+        if self.m.muy_cansada:
             self.decir("uff...", dur=1.5)
             self._cambiar(REPOSO, 2)
             return

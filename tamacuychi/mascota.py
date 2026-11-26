@@ -11,6 +11,9 @@ from . import config
 HORA = 3600.0
 MAX_CACAS = 4
 ESCALA_DEFECTO = 2         # "Pequeña"
+# Las cobayas duermen mucho: se cansa en 8 h despierta y recarga en 45 min
+DURA_DESPIERTA_H = 8.0
+RECARGA_SUENO_H = 0.75
 MAX_AUSENCIA = 12 * HORA   # lo que se tiene en cuenta del tiempo con el programa cerrado
 
 
@@ -32,6 +35,9 @@ class Mascota:
         self.silencio = False
         self.escala = ESCALA_DEFECTO
         self.nombre = ""
+        self.estilo = "tricolor"
+        self.accesorios = {}       # hueco ("cabeza", "cara", "cuerpo") -> id
+        self.buscar_actualizaciones = True
         self.nombre_preguntado = False
         self.posicion = None       # [x, y] del centro de los pies
         self.inicio_configurado = False   # la primera vez se activa el inicio con Windows
@@ -50,7 +56,18 @@ class Mascota:
 
     @property
     def cansada(self):
+        """Se va a dormir sola."""
+        return self.energia < 30
+
+    @property
+    def muy_cansada(self):
+        """Ni siquiera quiere jugar."""
         return self.energia < 15
+
+    @property
+    def con_sueno(self):
+        """Echa siestas de vez en cuando."""
+        return self.energia < 75
 
     # -- paso del tiempo --------------------------------------------------
     def avanzar(self):
@@ -64,11 +81,11 @@ class Mascota:
         ritmo_fel = 100.0 / 8.0 * (2.0 if self.hambrienta else 1.0) * (1.0 + 0.5 * len(self.cacas))
         self.felicidad -= ritmo_fel * h
         if self.durmiendo:
-            self.energia += 100.0 / 3.0 * h
+            self.energia += 100.0 / RECARGA_SUENO_H * h
             if self.energia >= 100:
                 eventos.append("despierta")
         else:
-            self.energia -= 100.0 / 14.0 * h
+            self.energia -= 100.0 / DURA_DESPIERTA_H * h
         self._limitar()
 
         if t >= self.prox_caca:
@@ -140,7 +157,8 @@ class Mascota:
     # -- guardado ---------------------------------------------------------
     _CAMPOS = ("saciedad", "felicidad", "energia", "durmiendo", "cacas", "prox_caca",
                "caca_tras_comer", "archivos_comidos", "silencio", "posicion",
-               "nombre", "nombre_preguntado", "inicio_configurado")
+               "nombre", "nombre_preguntado", "inicio_configurado", "estilo", "accesorios",
+               "buscar_actualizaciones")
 
     def guardar(self):
         datos = {k: getattr(self, k) for k in self._CAMPOS}
@@ -165,6 +183,12 @@ class Mascota:
                 setattr(self, k, datos[k])
         self.escala = datos.get("tamano", ESCALA_DEFECTO)
         self.nombre = str(self.nombre or "")[:24]
+        from .arte import ACCESORIOS, ESTILOS
+        if self.estilo not in ESTILOS:
+            self.estilo = "tricolor"
+        validos = {h: {i for i, _ in ops} for h, ops in ACCESORIOS.items()}
+        acc = self.accesorios if isinstance(self.accesorios, dict) else {}
+        self.accesorios = {h: v for h, v in acc.items() if v in validos.get(h, ())}
         # el tiempo con el programa cerrado también cuenta (con tope)
         if "ultimo_real" in datos:
             fuera = max(0.0, time.time() - float(datos["ultimo_real"])) * config.VELOCIDAD_TIEMPO

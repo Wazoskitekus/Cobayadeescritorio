@@ -18,20 +18,28 @@ from . import arte, config
 MAX_CACHE = 48
 
 
-def _imagen(filas):
-    w, h, datos = arte.a_rgba(filas)
+def _imagen(filas, pal=None):
+    w, h, datos = arte.a_rgba(filas, 1, pal)
     img = QImage(datos, w, h, w * 4, QImage.Format_RGBA8888)
     return img.copy()   # copia para que no dependa del buffer de Python
 
 
 class Sprites:
-    def __init__(self):
+    def __init__(self, estilo="tricolor", accesorios=None):
         self._base = {}      # nombre -> [QImage]
         self._cache = OrderedDict()   # pocos sprites escalados a la vez (ahorra RAM)
         self.dpr = 1.0       # relación píxel físico/lógico de la pantalla
-        for nombre, fotogramas in arte.catalogo().items():
-            self._base[nombre] = [_imagen(f) for f in fotogramas]
-        self._cargar_png()
+        self.configurar(estilo, accesorios)
+
+    def configurar(self, estilo, accesorios):
+        """Vuelve a generar el arte con otro estilo o accesorios."""
+        pal = arte.paleta(estilo)
+        self._base = {nombre: [_imagen(f, pal) for f in fotogramas]
+                      for nombre, fotogramas in arte.catalogo(estilo, accesorios).items()}
+        self._cache.clear()
+        # los PNG de sprites/ sustituyen al arte de la cobaya tricolor sin accesorios
+        if estilo == "tricolor" and not any((accesorios or {}).values()):
+            self._cargar_png()
 
     def _cargar_png(self):
         carpeta = config.carpeta_sprites()

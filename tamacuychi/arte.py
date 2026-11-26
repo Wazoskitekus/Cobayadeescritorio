@@ -40,9 +40,30 @@ PALETA = {
     "r": (232, 64, 96),     # corazón
     "q": (255, 150, 170),   # corazón brillo
     "Q": (120, 24, 48),     # corazón contorno
+    "F": (246, 168, 170),   # patas
+    "f": (214, 118, 124),   # patas sombra
+    "N": (246, 168, 170),   # nariz
+    "n": (214, 118, 124),   # nariz oscura
+    "A": (176, 232, 70),    # antenas (cobaya espacial)
+    "a": (60, 110, 30),     # antenas contorno
+    # accesorios (mismo color en todos los estilos)
+    "#": (34, 26, 30),      # contorno de accesorios
+    "X": (52, 52, 64),      # sombrero
+    "x": (92, 92, 110),     # sombrero brillo
+    "V": (214, 52, 64),     # cinta del sombrero
+    "U": (90, 170, 240),    # gorro de fiesta
+    "u": (255, 214, 72),    # rayas del gorro
+    "J": (196, 142, 30),    # corona sombra
+    "L": (36, 40, 56),      # cristales de las gafas
+    "i": (130, 150, 190),   # brillo de las gafas
+    "S": (70, 146, 206),    # mochila
+    "s": (44, 102, 156),    # mochila sombra
+    "e": (250, 210, 80),    # hebilla
+    "D": (222, 62, 62),     # bufanda
+    "k": (160, 36, 40),     # bufanda sombra
 }
 
-SOMBRA = {"O": "o", "C": "c", "B": "b", "P": "p", "H": "h", "G": "g"}
+SOMBRA = {"O": "o", "C": "c", "B": "b", "P": "p", "H": "h", "G": "g", "F": "f"}
 
 
 class Lienzo:
@@ -183,7 +204,7 @@ def _cuerpo_frente(orejas_arriba=False, aplastar=0):
     c.sombra_inferior(2)
     # patitas
     for px in (10.5, 22.5):
-        c.elipse(px, 27.6 + aplastar * 0.3, 2.3, 1.3, "P")
+        c.elipse(px, 27.6 + aplastar * 0.3, 2.3, 1.3, "F")
     c.contorno("K")
     return c
 
@@ -213,7 +234,7 @@ def _cara(c, ojos="normal", boca="w", rubor=False, lagrimas=0, cejas=False):
         c.sello(OJO_I[0] + 1, y, ["T", "T"])
         c.sello(OJO_D[0] + 2, y, ["T", "T"])
     # nariz
-    c.sello(15, 13, ["pPp", ".p."])
+    c.sello(15, 13, ["nNn", ".n."])
     if boca == "w":
         c.sello(14, 15, ["K.K.K", ".K.K."])
     elif boca == "abierta":
@@ -262,8 +283,8 @@ def espalda(paso=0):
     c.sombra_inferior(2)
     # patitas traseras alternas
     dy = (0, -1) if paso == 0 else (-1, 0)
-    c.elipse(10.5, 27.6 + dy[0], 2.4, 1.3, "P")
-    c.elipse(22.5, 27.6 + dy[1], 2.4, 1.3, "P")
+    c.elipse(10.5, 27.6 + dy[0], 2.4, 1.3, "F")
+    c.elipse(22.5, 27.6 + dy[1], 2.4, 1.3, "F")
     c.contorno("K")
     # rayita del culete
     c.sello(16, 23, ["c", "c", "c"])
@@ -281,7 +302,7 @@ def perfil(paso=0, ojos="normal", boca="cerrada", orejas_arriba=False, estirar=0
     # patas (detrás del cuerpo): paso 0 quieta, 1 y 2 alternas
     pies = {0: (0, 0, 0, 0), 1: (-1, 1, 1, -1), 2: (1, -1, -1, 1)}[paso]
     for (x, d) in zip((8.5, 13.0, 25.0, 29.0), pies):
-        c.elipse(x + d * 0.8, 23.4 - (abs(d) * 0.4 if d < 0 else 0), 2.2, 1.4, "P")
+        c.elipse(x + d * 0.8, 23.4 - (abs(d) * 0.4 if d < 0 else 0), 2.2, 1.4, "F")
     # oreja
     oy = 6.0 if not orejas_arriba else 4.6
     c.elipse(24.0, oy, 3.4, 2.4, "B")
@@ -324,7 +345,7 @@ def perfil(paso=0, ojos="normal", boca="cerrada", orejas_arriba=False, estirar=0
     elif ojos == "feliz":
         c.sello(ex, ey, ["..", "EE", "E."])
     nx = int(35 + estirar)
-    c.sello(nx, 14, ["p"])
+    c.sello(nx, 14, ["n"])
     if boca == "abierta":
         c.sello(nx - 2, 17, ["KK", "pK"])
     elif boca == "masticar":
@@ -473,28 +494,272 @@ def _rng(semilla):
 
 
 # ---------------------------------------------------------------------------
+# Estilos: la misma cobaya con otros colores (cambian las letras de la paleta)
+# ---------------------------------------------------------------------------
+ESTILOS = {
+    "tricolor": ("Tricolor", {}),
+    "negra": ("Negra", {
+        "K": (14, 11, 13), "O": (60, 54, 58), "o": (40, 36, 40), "C": (84, 77, 81),
+        "c": (56, 51, 55), "B": (50, 45, 48), "b": (34, 30, 34), "P": (156, 104, 114),
+        "p": (122, 82, 92), "F": (124, 98, 106), "f": (92, 72, 80), "N": (150, 104, 114),
+        "n": (116, 80, 90), "E": (4, 4, 6),
+    }),
+    "marron": ("Marrón", {
+        "K": (52, 30, 18), "O": (158, 100, 56), "o": (124, 76, 40), "C": (208, 166, 120),
+        "c": (178, 136, 94), "B": (134, 84, 46), "b": (102, 62, 34),
+    }),
+    "espacial": ("Espacial", {
+        "K": (34, 70, 20), "O": (168, 226, 58), "o": (128, 184, 40), "C": (192, 238, 98),
+        "c": (152, 206, 62), "B": (158, 218, 54), "b": (120, 172, 38), "P": (118, 176, 40),
+        "p": (90, 140, 30), "F": (168, 226, 58), "f": (128, 184, 40), "N": (212, 150, 128),
+        "n": (176, 112, 96), "E": (8, 8, 10),
+    }),
+}
+
+
+def paleta(estilo="tricolor"):
+    pal = dict(PALETA)
+    pal.update(ESTILOS.get(estilo, ESTILOS["tricolor"])[1])
+    return pal
+
+
+# ---------------------------------------------------------------------------
+# Accesorios: sellos de píxeles que se colocan en cada vista
+# ---------------------------------------------------------------------------
+# hueco -> [(id, nombre), ...]
+ACCESORIOS = {
+    "cabeza": [("sombrero", "Sombrero"), ("gorro", "Gorro de fiesta"), ("corona", "Corona"),
+               ("lazo", "Lazo")],
+    "cara": [("gafas", "Gafas de sol")],
+    "cuerpo": [("mochila", "Mochila"), ("bufanda", "Bufanda")],
+}
+
+SOMBRERO = [
+    "...#######...",
+    "...#xXXXX#...",
+    "...#xXXXX#...",
+    "...#VVVVV#...",
+    ".###XXXXX###.",
+    "#XXXXXXXXXXX#",
+    ".###########.",
+]
+GORRO = [
+    "....W....",
+    "...WWW...",
+    "...#U#...",
+    "..#UUu#..",
+    "..#uUU#..",
+    ".#UUuUU#.",
+    ".#uUUUu#.",
+    "#UUUuUUU#",
+    "#########",
+]
+CORONA = [
+    ".#...#...#.",
+    "#Y#.#Y#.#Y#",
+    "#YY#YrY#YY#",
+    "#YYYYYYYYY#",
+    "#JJJJJJJJJ#",
+    "###########",
+]
+LAZO = [
+    "##.....##",
+    "#qr#.#rq#",
+    "#rrr#rrr#",
+    "#qr#.#rq#",
+    "##.....##",
+]
+GAFAS = [
+    "#######.........#######",
+    "#iLLLL###########iLLLL#",
+    "#LLLLL#.........#LLLLL#",
+    "#LLLLL#.........#LLLLL#",
+    ".#####...........#####.",
+]
+GAFAS_PERFIL = [
+    "######",
+    "...#iL#",
+    "...#LL#",
+    "...####",
+]
+MOCHILA_ESPALDA = [
+    "..########..",
+    ".#SSSSSSSS#.",
+    "#SSSSSSSSSS#",
+    "#SSSSSSSSSS#",
+    "#ssssssssss#",
+    "#S########S#",
+    "#S#SSeeSS#S#",
+    "#S#SSSSSS#S#",
+    "#S########S#",
+    "#ssssssssss#",
+    ".##########.",
+]
+MOCHILA_PERFIL = [
+    ".########.",
+    "#SSSSSSSS#",
+    "#SSSSSSSS#",
+    "#ssssssss#",
+    "#S######S#",
+    "#S#SeeS#S#",
+    "#S######S#",
+    "#ssssssss#",
+    ".########.",
+]
+
+MARGEN = 12   # filas libres por arriba para sombreros y antenas (luego se recortan)
+
+
+def _desde(filas):
+    c = Lienzo(max(len(f) for f in filas), len(filas))
+    for y, f in enumerate(filas):
+        for x, ch in enumerate(f):
+            c.px[y][x] = ch
+    return c
+
+
+def _arriba(c, x):
+    """Primera fila ocupada en la columna x."""
+    for y in range(c.h):
+        if c.px[y][x] != ".":
+            return y
+    return c.h
+
+
+def _antena(c, x, lado):
+    y0 = _arriba(c, x)
+    for k in range(1, 6):
+        xx = x + (lado if k >= 4 else 0)
+        c.set(xx, y0 - k, "a")
+    bx, by = x + lado, y0 - 6
+    c.sello(bx - 1, by - 2, [".aa.", "aAAa", "aAWa", ".aa."])
+
+
+def _banda(c, filas, x0, x1):
+    """Bufanda horizontal: solo se pinta sobre la cobaya."""
+    estilo_fila = ["#", "Dr", "k", "#"]
+    for i, y in enumerate(filas):
+        for x in range(x0, x1 + 1):
+            if c.get(x, y) not in ".":
+                tipo = estilo_fila[i]
+                if tipo == "Dr":
+                    tipo = "W" if x % 4 == 0 else "D"
+                c.set(x, y, tipo)
+
+
+def _sello_centrado(c, sello, cx, y_abajo):
+    w = len(sello[0])
+    c.sello(int(round(cx - w / 2)), y_abajo - len(sello) + 1, sello)
+
+
+def _cabeza(c, acc, cx, top, lazo_x, lazo_top):
+    if acc == "sombrero":
+        _sello_centrado(c, SOMBRERO, cx, top + 2)
+    elif acc == "gorro":
+        _sello_centrado(c, GORRO, cx, top + 1)
+    elif acc == "corona":
+        _sello_centrado(c, CORONA, cx, top + 1)
+    elif acc == "lazo":
+        _sello_centrado(c, LAZO, lazo_x, lazo_top + 2)
+
+
+def vestir(filas, vista, estilo="tricolor", accesorios=None, estirar=0):
+    """Añade antenas (cobaya espacial) y accesorios a un fotograma de la cobaya."""
+    acc = accesorios or {}
+    if estilo != "espacial" and not any(acc.values()):
+        return filas
+    M = MARGEN
+    c = _desde(["." * len(filas[0])] * M + list(filas))
+    cabeza, cara, cuerpo = acc.get("cabeza"), acc.get("cara"), acc.get("cuerpo")
+
+    # alturas de la cabeza antes de poner antenas (para sombreros y lazos)
+    arriba = {x: _arriba(c, x) for x in range(c.w)}
+
+    if vista in ("frente", "espalda"):
+        if estilo == "espacial":
+            _antena(c, 12, -1)
+            _antena(c, 20, 1)
+        if cuerpo == "bufanda":
+            _banda(c, range(M + 18, M + 22), 2, 30)
+            if vista == "frente":
+                c.sello(19, M + 21, ["#DD#", "#Dk#", "#DD#", "#kD#", ".##."])
+        elif cuerpo == "mochila":
+            if vista == "espalda":
+                c.sello(10, M + 13, MOCHILA_ESPALDA)
+            else:
+                for y in range(M + 16, M + 23):
+                    for x, col in ((8, "s"), (9, "S"), (23, "S"), (24, "s")):
+                        if c.get(x, y) != ".":
+                            c.set(x, y, col)
+        if cara == "gafas" and vista == "frente":
+            c.sello(5, M + 8, GAFAS)
+        if cabeza:
+            lazo_x = 22 if vista == "frente" else 10
+            _cabeza(c, cabeza, 16.5, arriba[16], lazo_x, arriba[lazo_x])
+
+    elif vista == "perfil":
+        hx = 27 + estirar
+        if estilo == "espacial":
+            _antena(c, hx - 1, -1)
+            _antena(c, hx + 2, 1)
+        if cuerpo == "bufanda":
+            for y in range(c.h):
+                for i, x in enumerate(range(19 + estirar, 24 + estirar)):
+                    if c.get(x, y) not in "." and y > M + 6:
+                        c.set(x, y, "#DWDk#"[i] if i < 5 else "#")
+        elif cuerpo == "mochila":
+            c.sello(6, M + 4, MOCHILA_PERFIL)
+            for y in range(M + 10, M + 18):
+                if c.get(16, y) != ".":
+                    c.set(16, y, "s")
+        if cara == "gafas":
+            c.sello(hx - 5, M + 9, GAFAS_PERFIL)
+        if cabeza:
+            _cabeza(c, cabeza, hx + 0.5, arriba[hx], hx - 3, arriba[hx - 3])
+
+    elif vista == "heno" and estilo == "espacial":
+        _antena(c, 23, -1)
+        _antena(c, 27, 1)
+
+    filas_out = c.filas()
+    while filas_out and set(filas_out[0]) == {"."}:
+        filas_out.pop(0)
+    return filas_out
+
+
+# ---------------------------------------------------------------------------
 # Catálogo: nombre -> lista de fotogramas
 # ---------------------------------------------------------------------------
-def catalogo():
+def catalogo(estilo="tricolor", accesorios=None):
+    def F(**k):
+        return vestir(frente(**k), "frente", estilo, accesorios)
+
+    def P(paso=0, estirar=0, **k):
+        return vestir(perfil(paso, estirar=estirar, **k), "perfil", estilo, accesorios, estirar)
+
+    def E(paso):
+        return vestir(espalda(paso), "espalda", estilo, accesorios)
+
     s = {}
-    s["cobaya_idle"] = [frente(), frente(ojos="cerrado")]
-    s["cobaya_mira"] = [frente(ojos="mira")]
-    s["cobaya_feliz"] = [frente(ojos="feliz", rubor=True), frente(ojos="feliz", boca="abierta", rubor=True)]
-    s["cobaya_triste"] = [frente(ojos="triste", boca="triste", cejas=True, lagrimas=1),
-                          frente(ojos="triste", boca="triste", cejas=True, lagrimas=3)]
-    s["cobaya_comer"] = [frente(boca="abierta"), frente(ojos="feliz", boca="masticar")]
-    s["cobaya_cui"] = [frente(boca="muy_abierta"), frente(boca="muy_abierta", orejas_arriba=True)]
-    s["cobaya_espalda"] = [espalda(0), espalda(1)]
-    s["cobaya_estirar"] = [perfil(estirar=2, ojos="cerrado"), perfil(estirar=3, ojos="cerrado", boca="abierta")]
-    s["cobaya_bostezo"] = [frente(ojos="apretado", boca="bostezo"), frente(ojos="apretado", boca="bostezo", orejas_arriba=True)]
-    s["cobaya_colgando"] = [frente(ojos="normal", boca="abierta", orejas_arriba=True),
-                            frente(ojos="mira", boca="abierta", orejas_arriba=True)]
-    s["cobaya_aterriza"] = [frente(ojos="feliz", aplastar=2)]
-    s["cobaya_perfil"] = [perfil(0), perfil(0, ojos="cerrado")]
-    s["cobaya_andar"] = [perfil(1), perfil(0), perfil(2), perfil(0)]
-    s["cobaya_perfil_feliz"] = [perfil(0, ojos="feliz", boca="abierta")]
-    s["cobaya_perfil_comer"] = [perfil(0, boca="abierta"), perfil(0, ojos="feliz", boca="masticar")]
-    s["heno"] = [heno(0), heno(1), heno(2)]
+    s["cobaya_idle"] = [F(), F(ojos="cerrado")]
+    s["cobaya_mira"] = [F(ojos="mira")]
+    s["cobaya_feliz"] = [F(ojos="feliz", rubor=True), F(ojos="feliz", boca="abierta", rubor=True)]
+    s["cobaya_triste"] = [F(ojos="triste", boca="triste", cejas=True, lagrimas=1),
+                          F(ojos="triste", boca="triste", cejas=True, lagrimas=3)]
+    s["cobaya_comer"] = [F(boca="abierta"), F(ojos="feliz", boca="masticar")]
+    s["cobaya_cui"] = [F(boca="muy_abierta"), F(boca="muy_abierta", orejas_arriba=True)]
+    s["cobaya_espalda"] = [E(0), E(1)]
+    s["cobaya_estirar"] = [P(estirar=2, ojos="cerrado"), P(estirar=3, ojos="cerrado", boca="abierta")]
+    s["cobaya_bostezo"] = [F(ojos="apretado", boca="bostezo"),
+                           F(ojos="apretado", boca="bostezo", orejas_arriba=True)]
+    s["cobaya_colgando"] = [F(ojos="normal", boca="abierta", orejas_arriba=True),
+                            F(ojos="mira", boca="abierta", orejas_arriba=True)]
+    s["cobaya_aterriza"] = [F(ojos="feliz", aplastar=2)]
+    s["cobaya_perfil"] = [P(0), P(0, ojos="cerrado")]
+    s["cobaya_andar"] = [P(1), P(0), P(2), P(0)]
+    s["cobaya_perfil_feliz"] = [P(0, ojos="feliz", boca="abierta")]
+    s["cobaya_perfil_comer"] = [P(0, boca="abierta"), P(0, ojos="feliz", boca="masticar")]
+    s["heno"] = [heno(0)] + [vestir(heno(i), "heno", estilo) for i in (1, 2)]
     s["lechuga"] = [lechuga(i) for i in range(4)]
     s["caca"] = [CACA]
     s["corazon"] = [CORAZON]
@@ -507,8 +772,9 @@ def catalogo():
 # ---------------------------------------------------------------------------
 # Utilidades para exportar (sin dependencias)
 # ---------------------------------------------------------------------------
-def a_rgba(filas, escala=1):
+def a_rgba(filas, escala=1, pal=None):
     """Devuelve (ancho, alto, bytes RGBA)."""
+    pal = pal or PALETA
     h = len(filas)
     w = max(len(f) for f in filas)
     out = bytearray()
@@ -516,10 +782,10 @@ def a_rgba(filas, escala=1):
         linea = bytearray()
         for x in range(w):
             ch = f[x] if x < len(f) else "."
-            if ch == "." or ch not in PALETA:
+            if ch == "." or ch not in pal:
                 px = b"\x00\x00\x00\x00"
             else:
-                r, g, b = PALETA[ch]
+                r, g, b = pal[ch]
                 px = bytes((r, g, b, 255))
             linea += px * escala
         out += bytes(linea) * escala
