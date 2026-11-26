@@ -22,16 +22,9 @@ y se desinstala desde *Configuración → Aplicaciones*. Si no quieres instalar 
 descarga **`Tamacuychi-portable.exe`**, que funciona con doble clic.
 
 Los .exe los compila GitHub Actions (`.github/workflows/windows.yml`) en cada
-cambio de `main` (en *Actions* → la ejecución → *Artifacts*). Para publicar una
-versión nueva en Releases, sube una etiqueta:
-
-```bash
-git tag v1.0.1
-```
-
-```bash
-git push origin v1.0.1
-```
+cambio de `main` y los publica en Releases con la versión de
+`tamacuychi/__init__.py`. Para sacar una versión nueva, sube ese número
+(por ejemplo a `1.0.1`); si no cambia, se actualizan los archivos de la misma Release.
 
 ## Arrancar desde el código
 

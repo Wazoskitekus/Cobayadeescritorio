@@ -8,7 +8,7 @@ empiezas una conversación nueva, adjunta este archivo y di en qué quieres segu
   El firmware sigue en https://github.com/Wazoskitekus/Tamacuychi.
 - **Instalador de Windows:** lo compila GitHub Actions (`.github/workflows/windows.yml`):
   PyInstaller (carpeta) + Inno Setup (`instalador.iss`) y además un .exe portable.
-  Cada etiqueta `vX.Y.Z` lo publica en Releases.
+  Cada push a `main` lo publica en Releases con la versión de `tamacuychi/__init__.py`.
 - **Estado:** probado en Linux sin pantalla (Qt *offscreen*): todos los estados,
   clic, arrastrar, caricias, soltar archivos (van de verdad a la papelera), cacas,
   dormir y despertar, y un ejecutable de PyInstaller que arranca. **Falta probarlo
