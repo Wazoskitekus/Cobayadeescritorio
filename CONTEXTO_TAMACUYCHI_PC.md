@@ -60,10 +60,23 @@ empiezas una conversación nueva, adjunta este archivo y di en qué quieres segu
 - **Accesorios** (`arte.ACCESORIOS`): cabeza (sombrero, gorro, corona, lazo),
   cara (gafas) y cuerpo (mochila, bufanda). Se dibujan con `arte.vestir()` en cada
   vista (frente, perfil, espalda) buscando dónde está la cabeza.
-- **Sueño**: recarga en 45 min, se cansa en 8 h, se duerme sola por debajo de 30
-  y echa siestas por debajo de 75.
+- **Sueño** (cambiado en la 1.3): recarga en 45 min, se cansa en 8 h.
 - Windows bloqueaba el instalador en otro PC por no estar firmado; la solución
   definitiva es firmarlo (SignPath Foundation es gratis si el repositorio es público).
+
+## Versión 1.3
+
+- **Varias cobayas** (hasta 4, `manada.py`): cada una es una ventana con su
+  `Mascota` (archivo `estado.json` la primera y `cobaya_N.json` las demás). Los
+  ajustes comunes (tamaño, sonido, actualizaciones, inicio con Windows y la lista
+  de cobayas) están en `ajustes.json` (se migran de `estado.json` de la 1.2).
+- **Juntas**: se buscan, se saludan nariz con nariz, juegan al pillapilla
+  (estados `perseguir`/`huir`), popcorning y sueño contagiosos, cui en coro y
+  comen juntas. La manada decide cada segundo (`Manada._social`) y reacciona a los
+  avisos de cada cobaya (`Manada.aviso`).
+- **Energía**: se cansa en 16 h despierta, recarga en 20 min, se duerme sola por
+  debajo de 20, siestas por debajo de 50 y nunca en los 45 min tras despertarse
+  (la 1.2 dormía demasiado).
 
 ## Comportamiento
 

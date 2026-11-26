@@ -10,10 +10,12 @@ from . import config
 
 HORA = 3600.0
 MAX_CACAS = 4
+MAX_COBAYAS = 4
 ESCALA_DEFECTO = 2         # "Pequeña"
-# Las cobayas duermen mucho: se cansa en 8 h despierta y recarga en 45 min
-DURA_DESPIERTA_H = 8.0
-RECARGA_SUENO_H = 0.75
+# Energía: se cansa en 16 h despierta y recarga en 20 min durmiendo
+DURA_DESPIERTA_H = 16.0
+RECARGA_SUENO_H = 1 / 3
+SIESTA_PAUSA_H = 0.75      # tras despertarse, no echa otra siesta en 45 min
 MAX_AUSENCIA = 12 * HORA   # lo que se tiene en cuenta del tiempo con el programa cerrado
 
 
@@ -22,8 +24,67 @@ def ahora():
     return time.time() * config.VELOCIDAD_TIEMPO
 
 
-class Mascota:
+def _leer(ruta):
+    try:
+        with open(ruta, encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return None
+
+
+def _escribir(ruta, datos):
+    tmp = ruta + ".tmp"
+    try:
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(datos, f, indent=1)
+        os.replace(tmp, ruta)
+    except OSError:
+        pass
+
+
+class Ajustes:
+    """Lo que es común a todas las cobayas."""
+
+    _CAMPOS = ("silencio", "escala", "buscar_actualizaciones", "inicio_configurado", "cobayas")
+
     def __init__(self):
+        self.silencio = False
+        self.escala = ESCALA_DEFECTO
+        self.buscar_actualizaciones = True
+        self.inicio_configurado = False
+        self.cobayas = [0]           # identificadores de las cobayas que viven en el escritorio
+        self._ruta = os.path.join(config.carpeta_datos(), "ajustes.json")
+        datos = _leer(self._ruta)
+        if datos is None:
+            # versión 1.2 o anterior: los ajustes estaban dentro de estado.json
+            viejo = _leer(os.path.join(config.carpeta_datos(), "estado.json")) or {}
+            datos = {k: viejo[k] for k in ("silencio", "buscar_actualizaciones", "inicio_configurado")
+                     if k in viejo}
+            if "tamano" in viejo:
+                datos["escala"] = viejo["tamano"]
+        for k in self._CAMPOS:
+            if k in datos:
+                setattr(self, k, datos[k])
+        try:
+            self.escala = int(self.escala) if int(self.escala) in (2, 3, 4, 5, 6) else ESCALA_DEFECTO
+        except (TypeError, ValueError):
+            self.escala = ESCALA_DEFECTO
+        ids = [i for i in self.cobayas if isinstance(i, int) and 0 <= i < 100]
+        self.cobayas = list(dict.fromkeys(ids))[:MAX_COBAYAS] or [0]
+
+    def guardar(self):
+        _escribir(self._ruta, {k: getattr(self, k) for k in self._CAMPOS})
+
+    def nuevo_id(self):
+        i = 0
+        while i in self.cobayas:
+            i += 1
+        return i
+
+
+class Mascota:
+    def __init__(self, ident=0):
+        self.ident = ident
         self.saciedad = 80.0
         self.felicidad = 80.0
         self.energia = 90.0
@@ -32,17 +93,15 @@ class Mascota:
         self.prox_caca = ahora() + random.uniform(30, 60) * 60
         self.caca_tras_comer = None
         self.archivos_comidos = 0
-        self.silencio = False
-        self.escala = ESCALA_DEFECTO
         self.nombre = ""
         self.estilo = "tricolor"
         self.accesorios = {}       # hueco ("cabeza", "cara", "cuerpo") -> id
-        self.buscar_actualizaciones = True
         self.nombre_preguntado = False
         self.posicion = None       # [x, y] del centro de los pies
-        self.inicio_configurado = False   # la primera vez se activa el inicio con Windows
+        self.ultimo_despertar = 0.0
         self._ultimo = ahora()
-        self._ruta = os.path.join(config.carpeta_datos(), "estado.json")
+        archivo = "estado.json" if ident == 0 else "cobaya_%d.json" % ident
+        self._ruta = os.path.join(config.carpeta_datos(), archivo)
         self.cargar()
 
     # -- estado derivado --------------------------------------------------
@@ -57,17 +116,17 @@ class Mascota:
     @property
     def cansada(self):
         """Se va a dormir sola."""
-        return self.energia < 30
+        return self.energia < 20
 
     @property
     def muy_cansada(self):
         """Ni siquiera quiere jugar."""
-        return self.energia < 15
+        return self.energia < 10
 
     @property
     def con_sueno(self):
-        """Echa siestas de vez en cuando."""
-        return self.energia < 75
+        """Puede echar una siesta (no justo después de despertarse)."""
+        return self.energia < 50 and ahora() - self.ultimo_despertar > SIESTA_PAUSA_H * HORA
 
     # -- paso del tiempo --------------------------------------------------
     def avanzar(self):
@@ -128,7 +187,7 @@ class Mascota:
 
     def jugar(self):
         self.felicidad += 15
-        self.energia -= 6
+        self.energia -= 4
         self.saciedad -= 3
         self._limitar()
         self.guardar()
@@ -146,7 +205,15 @@ class Mascota:
 
     def despertar(self):
         self.durmiendo = False
+        self.ultimo_despertar = ahora()
         self.guardar()
+
+    def borrar(self):
+        """Se despide: borra su archivo."""
+        try:
+            os.remove(self._ruta)
+        except OSError:
+            pass
 
     def reset(self):
         self.saciedad, self.felicidad, self.energia = 80.0, 80.0, 90.0
@@ -156,32 +223,21 @@ class Mascota:
 
     # -- guardado ---------------------------------------------------------
     _CAMPOS = ("saciedad", "felicidad", "energia", "durmiendo", "cacas", "prox_caca",
-               "caca_tras_comer", "archivos_comidos", "silencio", "posicion",
-               "nombre", "nombre_preguntado", "inicio_configurado", "estilo", "accesorios",
-               "buscar_actualizaciones")
+               "caca_tras_comer", "archivos_comidos", "posicion", "nombre",
+               "nombre_preguntado", "estilo", "accesorios", "ultimo_despertar")
 
     def guardar(self):
         datos = {k: getattr(self, k) for k in self._CAMPOS}
-        datos["tamano"] = self.escala    # "escala" era el tamaño de la 1.0 (ya no se lee)
         datos["ultimo_real"] = time.time()
-        tmp = self._ruta + ".tmp"
-        try:
-            with open(tmp, "w", encoding="utf-8") as f:
-                json.dump(datos, f, indent=1)
-            os.replace(tmp, self._ruta)
-        except OSError:
-            pass
+        _escribir(self._ruta, datos)
 
     def cargar(self):
-        try:
-            with open(self._ruta, encoding="utf-8") as f:
-                datos = json.load(f)
-        except (OSError, ValueError):
+        datos = _leer(self._ruta)
+        if datos is None:
             return
         for k in self._CAMPOS:
             if k in datos:
                 setattr(self, k, datos[k])
-        self.escala = datos.get("tamano", ESCALA_DEFECTO)
         self.nombre = str(self.nombre or "")[:24]
         from .arte import ACCESORIOS, ESTILOS
         if self.estilo not in ESTILOS:
@@ -200,8 +256,6 @@ class Mascota:
         if self.caca_tras_comer is not None and abs(self.caca_tras_comer - t) > 2 * HORA:
             self.caca_tras_comer = None
         self.cacas = [list(c) for c in self.cacas][:MAX_CACAS]
-        try:
-            self.escala = int(self.escala) if int(self.escala) in (2, 3, 4, 5, 6) else ESCALA_DEFECTO
-        except (TypeError, ValueError):
-            self.escala = ESCALA_DEFECTO
+        if not isinstance(self.ultimo_despertar, (int, float)) or self.ultimo_despertar > t:
+            self.ultimo_despertar = 0.0
         self._limitar()

@@ -31,8 +31,10 @@ FONDO = 5           # cuánto más arriba está el heno ("al fondo"), en píxele
 REPOSO, ANDAR, COMIENDO, FELIZ, CUI, POPCORN = "reposo", "andar", "comiendo", "feliz", "cui", "popcorn"
 COGIDA, CAYENDO, ATERRIZA, NEGAR = "cogida", "cayendo", "aterriza", "negar"
 YENDO_A_DORMIR, DURMIENDO, DESPERTANDO = "yendo_a_dormir", "durmiendo", "despertando"
+PERSEGUIR, HUIR, SALUDO = "perseguir", "huir", "saludo"     # con otras cobayas
 
-OCUPADA = (COMIENDO, POPCORN, COGIDA, CAYENDO, YENDO_A_DORMIR, DURMIENDO, DESPERTANDO, NEGAR)
+OCUPADA = (COMIENDO, POPCORN, COGIDA, CAYENDO, YENDO_A_DORMIR, DURMIENDO, DESPERTANDO, NEGAR,
+           PERSEGUIR, HUIR, SALUDO)
 
 COL_SACIEDAD = QColor(240, 140, 50)
 COL_FELICIDAD = QColor(250, 120, 170)
@@ -50,7 +52,7 @@ MENSAJES_RECHAZO = {
 
 
 class Cobaya(QWidget):
-    def __init__(self, mascota, sprites, sonidos):
+    def __init__(self, mascota, sprites, sonidos, escala=2, manada=None):
         super().__init__(None, Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool
                          | Qt.NoDropShadowWindowHint)
         self.setAttribute(Qt.WA_TranslucentBackground)
@@ -60,8 +62,10 @@ class Cobaya(QWidget):
         self.setWindowTitle("Tamacuychi")
 
         self.m, self.spr, self.snd = mascota, sprites, sonidos
-        self.snd.silencio = self.m.silencio
-        self.e = self.m.escala
+        self.manada = manada           # las demás cobayas (manada.py)
+        self.e = escala
+        self._al_llegar = None         # qué hacer al terminar de andar
+        self._pareja = None            # otra cobaya con la que juega o se saluda
         self._ajustar_tamano()
         self.menu_fn = None            # lo pone app.py
         self._mascara_x11 = QGuiApplication.platformName() == "xcb"
@@ -160,7 +164,7 @@ class Cobaya(QWidget):
         self.move(int(round(self.px - self.width() / 2)), int(round(self.py - self.height())))
 
     def cambiar_escala(self, e):
-        self.e = self.m.escala = e
+        self.e = e
         self.spr.vaciar_cache()
         self._ajustar_tamano()
         self.px = min(max(self.px, self._limites_x()[0]), self._limites_x()[1])
@@ -186,12 +190,15 @@ class Cobaya(QWidget):
     def mostrar_barras(self, segundos):
         self._barras_hasta = time.monotonic() + segundos
 
-    def llamar(self):
+    def llamar(self, x=None):
         """Aparece cayendo desde arriba en la pantalla principal."""
         if self.estado in (DURMIENDO, YENDO_A_DORMIR, DESPERTANDO):
             return
+        if self._pareja is not None:
+            self._fin_juego(False)
+        self._al_llegar = None
         g = QGuiApplication.primaryScreen().availableGeometry()
-        self.px = g.center().x()
+        self.px = g.center().x() if x is None else x
         self.py = g.top() + self.height()
         self.vx, self.vy = random.uniform(-150, 150), 0.0
         self._cambiar(CAYENDO)
@@ -243,7 +250,7 @@ class Cobaya(QWidget):
 
         # Cuantos menos fotogramas, menos CPU: 60 por segundo solo al saltar o caer
         est = self.estado
-        if est in (POPCORN, CAYENDO, COGIDA):
+        if est in (POPCORN, CAYENDO, COGIDA, PERSEGUIR, HUIR):
             intervalo = 16
         elif est == DURMIENDO:
             intervalo = 120
@@ -289,10 +296,10 @@ class Cobaya(QWidget):
             return
         r = random.random()
         feliz = self.m.felicidad > 85 and self.m.energia > 50
-        if self.m.con_sueno and r < 0.06:
+        if self.m.con_sueno and r < 0.02:
             self.decir("zzz...", dur=1.5)       # siestecita
             self.dormir()
-        elif feliz and r < 0.11:
+        elif feliz and r < 0.07:
             self.popcorn()
         elif r < (0.35 if self.m.descuidada else 0.65):
             self.andar()
@@ -310,6 +317,9 @@ class Cobaya(QWidget):
         destino = min(max(destino, lo), hi)
         if abs(destino - self.px) < 8:
             self._cambiar(REPOSO, 2)
+            llegar, self._al_llegar = self._al_llegar, None
+            if llegar:
+                llegar()
             return
         self._objetivo = destino
         self.dir = 1 if destino > self.px else -1
@@ -321,7 +331,91 @@ class Cobaya(QWidget):
         if (self.px - self._objetivo) * self.dir >= 0:
             self.px = self._objetivo
             self._cambiar(REPOSO, random.uniform(2, 7))
+            llegar, self._al_llegar = self._al_llegar, None
+            if llegar:
+                llegar()
         self.py = self._suelo()
+
+    def ir_a(self, x, al_llegar=None):
+        """Anda hasta x y después hace al_llegar (por ejemplo, comer)."""
+        self._al_llegar = al_llegar
+        self.andar(x)
+
+    @property
+    def libre(self):
+        """Puede apuntarse a algo con las demás."""
+        return (self.estado in (REPOSO, ANDAR, CUI) and not self._oliendo and not self._cola
+                and self._al_llegar is None)
+
+    def _avisar(self, evento):
+        if self.manada is not None:
+            self.manada.aviso(evento, self)
+
+    # --- con otras cobayas ------------------------------------------------------
+    def pillapilla(self, otra, persigue):
+        """Juega a pillar: una persigue y la otra huye."""
+        self._pareja = otra
+        self._bocadillo = None
+        self.dir = 1 if (otra.px > self.px) == persigue else -1
+        self._cambiar(PERSEGUIR if persigue else HUIR, random.uniform(5, 9))
+        if persigue:
+            self.cui(solo_sonido=True)
+
+    def _fin_juego(self, pillada):
+        otra, self._pareja = self._pareja, None
+        if pillada:
+            self.m.felicidad = min(100.0, self.m.felicidad + 10)
+            self.m.energia = max(0.0, self.m.energia - 2)
+            self.m.guardar()
+            self.mostrar_barras(2)
+            self._cambiar(FELIZ, 1.6)
+        elif self.estado in (PERSEGUIR, HUIR, SALUDO):
+            self._cambiar(REPOSO, random.uniform(2, 4))
+        if otra is not None and otra._pareja is self:
+            otra._fin_juego(pillada)
+
+    def _act_perseguir(self, dt, ahora):
+        otra = self._pareja
+        if otra is None or otra.estado != HUIR or self.t_estado > self._dur:
+            self._fin_juego(False)
+            return
+        self.dir = 1 if otra.px > self.px else -1
+        self.px += self.dir * 30 * self.e * dt
+        self.py = self._suelo()
+        if abs(otra.px - self.px) < 12 * self.e:
+            self.decir("¡pillada!", dur=1.5)
+            self.snd.tocar("pop")
+            self._fin_juego(True)
+
+    def _act_huir(self, dt, ahora):
+        otra = self._pareja
+        if otra is None or otra.estado != PERSEGUIR:
+            self._fin_juego(False)
+            return
+        lo, hi = self._limites_x()
+        lejos = 1 if self.px >= otra.px else -1
+        # en la esquina se escabulle por el otro lado
+        if (self.px <= lo + 4 and lejos < 0) or (self.px >= hi - 4 and lejos > 0):
+            lejos = -lejos
+        self.dir = lejos
+        self.px = min(max(self.px + self.dir * 26 * self.e * dt, lo), hi)
+        self.py = self._suelo()
+
+    def saludar(self, otra):
+        """Se acercan las caras, se huelen y salen corazones."""
+        self._pareja = otra
+        self.dir = 1 if otra.px > self.px else -1
+        self._bocadillo = None
+        self._cambiar(SALUDO, 2.4)
+        self.m.felicidad = min(100.0, self.m.felicidad + 5)
+        self.m.guardar()
+
+    def _act_saludo(self, dt, ahora):
+        if int(self.t_estado / 0.5) != int((self.t_estado - dt) / 0.5) and self.dir > 0:
+            self._corazon(dx=10 * self.e)
+        if self.t_estado >= self._dur:
+            self._pareja = None
+            self._cambiar(REPOSO, random.uniform(2, 5))
 
     def _act_feliz(self, dt, ahora):
         if self.t_estado < 1.0 and int(self.t_estado / 0.25) != int((self.t_estado - dt) / 0.25):
@@ -344,8 +438,10 @@ class Cobaya(QWidget):
                 self.cui()
 
     # --- cui -------------------------------------------------------------
-    def cui(self, solo_sonido=False):
+    def cui(self, solo_sonido=False, avisar=True):
         n = random.choice((1, 2, 2, 3))
+        if avisar and not solo_sonido:
+            self._avisar("cui")
         self.snd.tocar("cui%d" % n)
         self.decir("cui!" if n == 1 else "cui " * (n - 1) + "cui!", dur=2.0)
         if not solo_sonido and self.estado in (REPOSO, ANDAR):
@@ -359,19 +455,24 @@ class Cobaya(QWidget):
         self._barras_hasta = time.monotonic() + 3
         self._cambiar(FELIZ, 1.8)
 
-    def _corazon(self):
+    def _corazon(self, dx=0):
         self._particulas.append({
-            "tipo": "corazon", "x": self.width() / 2 + random.uniform(-14, 14) * self.e,
+            "tipo": "corazon", "x": self.width() / 2 + dx + random.uniform(-14, 14) * self.e,
             "y": self.height() - 26 * self.e, "vx": random.uniform(-6, 6) * self.e,
             "vy": -14 * self.e, "vida": 0.0, "dur": 1.2})
 
     # --- comer -------------------------------------------------------------
-    def dar_lechuga(self):
-        if self.estado in (DURMIENDO, YENDO_A_DORMIR, DESPERTANDO, COMIENDO):
+    def dar_lechuga(self, compartir=True):
+        if self.estado in (DURMIENDO, YENDO_A_DORMIR, DESPERTANDO, COMIENDO, COGIDA, CAYENDO):
             return
+        if self._pareja is not None:
+            self._fin_juego(False)
+        self._salto = None
         self._comida = {"tipo": "lechuga"}
         self._bocadillo = None
         self._cambiar(COMIENDO)
+        if compartir:
+            self._avisar("lechuga")
 
     def _siguiente_archivo(self):
         ruta = self._cola.pop(0)
@@ -449,7 +550,7 @@ class Cobaya(QWidget):
                 "vida": 0.0, "dur": 0.7})
 
     # --- popcorning ---------------------------------------------------------
-    def popcorn(self):
+    def popcorn(self, contagio=False):
         if self.estado in OCUPADA:
             return
         if self.m.muy_cansada:
@@ -463,6 +564,8 @@ class Cobaya(QWidget):
         self._cambiar(POPCORN)
         self.cui(solo_sonido=True)
         self._nuevo_salto()
+        if not contagio:
+            self._avisar("popcorn")
 
     def _nuevo_salto(self):
         g = self._pantalla()
@@ -550,9 +653,14 @@ class Cobaya(QWidget):
                 self._cambiar(ATERRIZA)
 
     # --- dormir ---------------------------------------------------------------
-    def dormir(self):
+    def dormir(self, contagio=False):
         if self.estado in (DURMIENDO, YENDO_A_DORMIR, DESPERTANDO, COGIDA, CAYENDO):
             return
+        if self._pareja is not None:
+            self._fin_juego(False)
+        self._al_llegar = None
+        if not contagio:
+            self._avisar("dormir")
         self._comida = None
         self._salto = None
         self._bocadillo = None
@@ -657,6 +765,10 @@ class Cobaya(QWidget):
             if ahora < self._mirando:
                 return ("cobaya_mira", 0, False, e, 0, 0)
             return ("cobaya_idle", 1 if ahora < self._parpadeo else 0, False, e, 0, 0)
+        if est in (PERSEGUIR, HUIR):
+            return ("cobaya_andar", int(t / 0.08), self.dir < 0, e, 0, 0)
+        if est == SALUDO:
+            return ("cobaya_perfil_feliz", 0, self.dir < 0, e, 0, -abs(math.sin(t * 6)) * e)
         if est == ANDAR:
             return ("cobaya_andar", int(t / 0.13), self.dir < 0, e, 0, 0)
         if est == FELIZ:

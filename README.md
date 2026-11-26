@@ -81,6 +81,25 @@ y pone cara triste:
 Al soltar, el programa siempre le dice al Explorador "copiar", nunca "mover",
 para que el Explorador no borre el original por su cuenta.
 
+## Varias cobayas
+
+Clic derecho → **Añadir otra cobaya** (hasta 4). Cada una tiene su nombre, su
+estilo, sus accesorios y sus estadísticas, y llega cayendo desde arriba. Juntas:
+
+- **Se buscan** y se quedan cerca unas de otras.
+- **Se saludan** nariz con nariz, con corazones (+5 de felicidad).
+- **Juegan al pillapilla**: una persigue a otra hasta pillarla (+10 de felicidad).
+- **Popcorning contagioso**: si una salta, las demás se animan.
+- **Cui en coro**: cuando una hace cui, las otras contestan.
+- **Comen juntas**: al darle lechuga a una, las que tienen hambre se acercan y comen a su lado.
+- **Sueño contagioso**: si una se va a dormir, las que tienen sueño también.
+
+El clic derecho sobre una cobaya muestra su menú (con *Despedirse de…* para
+quitarla) y debajo lo común: *Lechuga para todas*, *Llamarlas a todas*, tamaño,
+sonido... En el icono de la bandeja hay un submenú por cobaya.
+
+![Varias cobayas](art/manada.png)
+
 ## Estilos y accesorios
 
 En el menú (clic derecho): **Estilo** (tricolor, negra, marrón o espacial, con
@@ -107,14 +126,14 @@ privado, GitHub no deja ver las Releases sin iniciar sesión.
 
 Igual que en el firmware:
 
-- **Desgaste**: la saciedad se vacía en 10 h, la felicidad en 8 h (el doble de rápido con hambre y un 50 % más por cada caca) y la energía en 8 h despierta. **Durmiendo recarga en 45 minutos** y se despierta sola.
+- **Desgaste**: la saciedad se vacía en 10 h, la felicidad en 8 h (el doble de rápido con hambre y un 50 % más por cada caca) y la energía en 16 h despierta. **Durmiendo recarga en 20 minutos** y se despierta sola.
 - El tiempo con el programa cerrado también cuenta (hasta 12 h).
 - **Cacas**: una cada 30–60 min y otra 10–20 min después de comer, como mucho 4, en el suelo a su lado, con líneas de olor.
 - **Descuidada** (saciedad < 25, felicidad < 30 o 3 cacas o más): cara triste y anda más despacio. Con hambre pide lechuga con un bocadillo.
 - **Cui**: de 1 a 3 silbidos que suben de tono, con bocadillo "cui!". Cada 1–3 min, o cada 15–35 s si tiene hambre.
 - **Anda** sola de un lado a otro por encima de la barra de tareas, mira a los lados y parpadea.
 - Muy contenta, a veces hace *popcorning* sola.
-- **Duerme mucho**: con la energía por debajo de 30 se va a dormir sola, y por debajo de 75 echa siestas de vez en cuando. Por debajo de 15 no quiere jugar.
+- **Siestas**: con la energía por debajo de 20 se va a dormir sola, y por debajo de 50 echa alguna siesta (nunca en los 45 minutos siguientes a despertarse). Por debajo de 10 no quiere jugar.
 - **Dormir**: aparece el heno, se da la vuelta (frente, perfil, espaldas), camina hacia él haciéndose pequeña y se mete dentro; el heno respira, asoman las orejas y salen zetas.
 
 Se guarda todo en `%APPDATA%\Tamacuychi\estado.json` (Windows),
@@ -130,6 +149,7 @@ tamacuychi/
   mascota.py            estadísticas, desgaste, cacas y guardado (sin Qt)
   papelera.py           comprobaciones y envío seguro a la papelera
   cacas.py              ventanitas de las cacas
+  manada.py             varias cobayas y lo que hacen juntas
   sonido.py             cui, bostezo, ñam... sintetizados a WAV
   actualizar.py         busca, descarga e instala versiones nuevas desde GitHub
   arte.py               pixel art generado por código, estilos y accesorios (sin Qt)
@@ -170,7 +190,7 @@ así que no importa que midan distinto.
 - Los sprites escalados se guardan en una caché pequeña (48 como máximo).
 - En Windows, al terminar de arrancar y cada 30 minutos, devuelve al sistema la
   memoria que ya no usa.
-- Medido en Linux: unos 59 MB en total, de los que unos 50 MB son Qt (una
+- Medido en Linux: unos 56 MB con una cobaya y unos 61 MB con cuatro, de los que unos 50 MB son Qt (una
   ventana de Qt vacía ya ocupa eso). La versión 1.0 ocupaba unos 80 MB.
 
 ## Notas técnicas
