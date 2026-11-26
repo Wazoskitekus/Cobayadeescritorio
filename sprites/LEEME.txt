@@ -1,0 +1,8 @@
+Pon aquí PNG para sustituir el arte generado por código.
+
+- Nombre: el mismo que en sprites_generados/ (por ejemplo cobaya_idle@2.png).
+- "@N" = N fotogramas puestos en horizontal, todos del mismo ancho.
+- 1 píxel del PNG = 1 píxel de arte (el programa lo escala él solo).
+- La cobaya se apoya por el centro de la fila de abajo de cada fotograma.
+
+Sirven también los PNG del firmware (cobaya_idle@2.png, cobaya_feliz@2.png...).
