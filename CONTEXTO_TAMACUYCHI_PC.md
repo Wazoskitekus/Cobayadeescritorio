@@ -78,6 +78,16 @@ empiezas una conversación nueva, adjunta este archivo y di en qué quieres segu
   debajo de 20, siestas por debajo de 50 y nunca en los 45 min tras despertarse
   (la 1.2 dormía demasiado).
 
+## Versión 1.3.1
+
+- Arreglo del actualizador: en el PC del usuario la 1.2/1.3 decía "No se pudo"
+  (sin registro, no se sabe el motivo exacto; lo más probable, certificados en el
+  Python empaquetado). Ahora usa `truststore` (verificador de Windows) y, si no,
+  `certifi`; guarda los errores en `registro.txt` y el bocadillo dice el motivo.
+- Al repetir la búsqueda tras un error ya no se queda en "Mirando...".
+- `Tamacuychi.exe --prueba-actualizacion salida.txt` comprueba la conexión sin
+  abrir ventanas; GitHub Actions lo ejecuta con el .exe recién compilado.
+
 ## Comportamiento
 
 Clic → popcorning por la pantalla (4–8 saltos de 40–280 px girándose en el

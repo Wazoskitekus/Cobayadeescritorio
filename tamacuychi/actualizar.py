@@ -37,13 +37,84 @@ def modo():
     return "portable"
 
 
+def _contexto_ssl():
+    """Certificados para hablar con GitHub.
+
+    1. truststore: usa el verificador del propio Windows, que descarga solo los
+       certificados raíz que le falten (el Python empaquetado no lo hace).
+    2. certifi: lista de certificados que va dentro del programa.
+    3. Lo que traiga Python.
+    """
+    import ssl
+    try:
+        import truststore
+        return truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    except Exception:
+        pass
+    try:
+        import certifi
+        return ssl.create_default_context(cafile=certifi.where())
+    except Exception:
+        return ssl.create_default_context()
+
+
+_ABRIDOR = None
+
+
 def _abrir(url, timeout=20, binario=False):
+    global _ABRIDOR
     import urllib.request
+    if _ABRIDOR is None:
+        _ABRIDOR = urllib.request.build_opener(urllib.request.HTTPSHandler(context=_contexto_ssl()))
     req = urllib.request.Request(url, headers={
         "User-Agent": "Tamacuychi/" + __version__,
         "Accept": "application/octet-stream" if binario else "application/vnd.github+json",
     })
-    return urllib.request.urlopen(req, timeout=timeout)
+    return _ABRIDOR.open(req, timeout=timeout)
+
+
+def _motivo(e):
+    """Explicación corta del error para el bocadillo."""
+    import ssl
+    import urllib.error
+    if isinstance(e, ssl.SSLError) or "CERTIFICATE" in str(e).upper():
+        return "certificado"
+    if isinstance(e, urllib.error.HTTPError):
+        if e.code in (403, 429):
+            return "GitHub ocupado"
+        return "GitHub %d" % e.code
+    if isinstance(e, urllib.error.URLError):
+        if isinstance(e.reason, ssl.SSLError) or "CERTIFICATE" in str(e.reason).upper():
+            return "certificado"
+        return "sin conexión"
+    if isinstance(e, (TimeoutError, OSError)):
+        return "sin conexión"
+    return "error"
+
+
+def registrar(texto):
+    """Apunta en registro.txt (en la carpeta de datos) lo que ha pasado."""
+    import time
+    ruta = os.path.join(config.carpeta_datos(), "registro.txt")
+    try:
+        lineas = []
+        if os.path.exists(ruta):
+            with open(ruta, encoding="utf-8", errors="replace") as f:
+                lineas = f.read().splitlines()[-300:]
+        lineas.append(time.strftime("%Y-%m-%d %H:%M:%S ") + texto)
+        with open(ruta, "w", encoding="utf-8") as f:
+            f.write("\n".join(lineas) + "\n")
+    except OSError:
+        pass
+
+
+def _fallo(act, e):
+    import traceback
+    act.error = str(e)
+    act.motivo = _motivo(e)
+    registrar("Tamacuychi %s: actualización (%s): %s\n%s" % (
+        __version__, act.motivo, e, traceback.format_exc()))
+    act.estado = "error"
 
 
 class Actualizador:
@@ -58,6 +129,8 @@ class Actualizador:
         self.nueva = None          # {"version", "url", "tam", "sha256", "pagina"}
         self.progreso = 0.0
         self.error = ""
+        self.motivo = ""
+        self.intento = 0           # cambia en cada búsqueda o descarga (para la interfaz)
         self.ruta_descarga = None
         self._hilo = None
 
@@ -70,6 +143,7 @@ class Actualizador:
         if self.ocupado:
             return
         self.estado = "buscando"
+        self.intento += 1
         self._hilo = threading.Thread(target=self._buscar, daemon=True)
         self._hilo.start()
 
@@ -98,8 +172,7 @@ class Actualizador:
             }
             self.estado = "nueva"
         except Exception as e:      # sin internet, GitHub caído, etc.
-            self.error = str(e)
-            self.estado = "error"
+            _fallo(self, e)
 
     # -- descargar ------------------------------------------------------------
     def descargar(self):
@@ -110,6 +183,7 @@ class Actualizador:
             webbrowser.open(self.nueva.get("pagina") or PAGINA)
             return
         self.estado = "descargando"
+        self.intento += 1
         self.progreso = 0.0
         self._hilo = threading.Thread(target=self._descargar, daemon=True)
         self._hilo.start()
@@ -141,8 +215,7 @@ class Actualizador:
             self.ruta_descarga = destino
             self.estado = "lista"
         except Exception as e:
-            self.error = str(e)
-            self.estado = "error"
+            _fallo(self, e)
 
     # -- instalar (hilo de Qt; después hay que cerrar la aplicación) ------------
     def instalar(self):
@@ -167,8 +240,8 @@ class Actualizador:
             os.replace(actual, viejo)
             os.replace(ruta, actual)
         except OSError as e:
-            self.error = str(e)
-            self.estado = "error"
+            self.intento += 1
+            _fallo(self, e)
             return False
         subprocess.Popen([actual], creationflags=flags, close_fds=True)
         return True

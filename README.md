@@ -119,6 +119,10 @@ con un bocadillo y aparece **Actualizar a la versión X** en el menú. Al pulsar
   en silencio y la cobaya vuelve a abrirse ya actualizada.
 - **Portable**: descarga el .exe nuevo y lo pone en lugar del viejo.
 
+Si falla, el bocadillo dice por qué ("sin conexión", "certificado", "GitHub
+ocupado") y el menú ofrece **Abrir la página de descargas**. El detalle queda en
+`registro.txt`, en la carpeta de datos (`%APPDATA%\Tamacuychi` en Windows).
+
 Para que funcione en cualquier PC, **el repositorio tiene que ser público**: si es
 privado, GitHub no deja ver las Releases sin iniciar sesión.
 

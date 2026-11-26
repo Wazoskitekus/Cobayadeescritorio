@@ -98,7 +98,28 @@ def liberar_memoria():
             pass
 
 
+def prueba_actualizacion(ruta_salida):
+    """Tamacuychi.exe --prueba-actualizacion salida.txt: comprueba la conexión con
+    GitHub sin abrir ninguna ventana (lo usa la compilación de GitHub Actions)."""
+    import time
+    from . import __version__
+    from .actualizar import Actualizador
+    act = Actualizador()
+    act.buscar()
+    while act.ocupado:
+        time.sleep(0.2)
+    texto = "version=%s estado=%s motivo=%s error=%s" % (
+        __version__, act.estado, act.motivo, act.error)
+    with open(ruta_salida, "w", encoding="utf-8") as f:
+        f.write(texto + "\n")
+    return 0 if act.estado in ("al_dia", "nueva") else 1
+
+
 def main():
+    if "--prueba-actualizacion" in sys.argv:
+        i = sys.argv.index("--prueba-actualizacion")
+        salida = sys.argv[i + 1] if len(sys.argv) > i + 1 else "prueba_actualizacion.txt"
+        return prueba_actualizacion(salida)
     _preparar_entorno()
     instancia = _Instancia()
     if not instancia.primera:
@@ -131,6 +152,7 @@ def main():
     limpiar_restos()
     act = Actualizador()
     aviso = {"estado": None, "manual": False}
+    from .actualizar import PAGINA, registrar
 
     def portavoz():
         """La cobaya que da los avisos (la primera que esté despierta)."""
@@ -176,9 +198,11 @@ def main():
         if est == "descargando":
             portavoz().decir("Descargando %d%%" % int(act.progreso * 100), dur=2)
             return
-        if est == aviso["estado"]:
+        # cada búsqueda cuenta aunque termine igual que la anterior
+        clave = (est, act.intento)
+        if clave == aviso["estado"] or est in (None, "buscando"):
             return
-        aviso["estado"] = est
+        aviso["estado"] = clave
         if est == "nueva":
             v = act.nueva["version"]
             portavoz().decir("¡Versión %s!" % v, dur=5)
@@ -188,8 +212,7 @@ def main():
         elif est == "al_dia" and aviso["manual"]:
             portavoz().decir("¡Estoy al día!", dur=3)
         elif est == "error" and (aviso["manual"] or act.nueva):
-            portavoz().decir("No se pudo :(", dur=3)
-            print("Tamacuychi: actualización:", act.error, file=sys.stderr)
+            portavoz().decir("No se pudo: %s" % act.motivo, dur=5)
         elif est == "lista":
             portavoz().decir("¡Hasta ahora!", dur=3)
             manada.guardar()
@@ -236,6 +259,8 @@ def main():
     def salir():
         manada.cerrar()
         app.quit()
+
+    registrar("Tamacuychi %s arrancado (%s)" % (__version__, sys.platform))
 
     # --- menús -------------------------------------------------------------
     def menu_cobaya(menu, c):
@@ -354,6 +379,9 @@ def main():
             accion("⬇  Descargando… %d%%" % int(act.progreso * 100), lambda: None, False)
         else:
             accion("🔄  Buscar actualizaciones", lambda: buscar_actualizacion(True), not act.ocupado)
+        if act.estado == "error":
+            import webbrowser
+            accion("🌐  Abrir la página de descargas", lambda: webbrowser.open(PAGINA))
         auto = menu.addAction("Buscar actualizaciones sola")
         auto.setCheckable(True)
         auto.setChecked(bool(ajustes.buscar_actualizaciones))
