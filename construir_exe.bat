@@ -6,7 +6,7 @@ python -m pip install -r requirements.txt pyinstaller || goto error
 python herramientas\exportar_sprites.py || goto error
 python -m PyInstaller --noconfirm --clean --onedir --windowed --name Tamacuychi ^
   --icon icono.ico --add-data "sprites;sprites" ^
-  --exclude-module PySide6.QtWebEngineCore --exclude-module PySide6.QtPdf ^
+  --exclude-module PySide6.QtWebEngineCore --exclude-module PySide6.QtPdf --exclude-module PySide6.QtMultimedia --exclude-module PySide6.QtNetwork --exclude-module PySide6.QtQml --exclude-module PySide6.QtQuick --exclude-module PySide6.QtOpenGL --exclude-module PySide6.QtSvg --exclude-module tkinter ^
   tamacuychi.pyw || goto error
 echo.
 echo Listo: dist\Tamacuychi\Tamacuychi.exe

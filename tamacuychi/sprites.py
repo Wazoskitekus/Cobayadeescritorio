@@ -8,11 +8,14 @@ Así se pueden reutilizar los PNG del firmware (cobaya_idle@2.png, ...).
 import glob
 import os
 import re
+from collections import OrderedDict
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QImage, QPixmap
 
 from . import arte, config
+
+MAX_CACHE = 48
 
 
 def _imagen(filas):
@@ -24,7 +27,7 @@ def _imagen(filas):
 class Sprites:
     def __init__(self):
         self._base = {}      # nombre -> [QImage]
-        self._cache = {}
+        self._cache = OrderedDict()   # pocos sprites escalados a la vez (ahorra RAM)
         self.dpr = 1.0       # relación píxel físico/lógico de la pantalla
         for nombre, fotogramas in arte.catalogo().items():
             self._base[nombre] = [_imagen(f) for f in fotogramas]
@@ -59,7 +62,9 @@ class Sprites:
         fisica = max(1, int(round(escala * self.dpr)))
         clave = (nombre, i, fisica, espejo)
         pm = self._cache.get(clave)
-        if pm is None:
+        if pm is not None:
+            self._cache.move_to_end(clave)
+        else:
             img = fotos[i]
             if espejo:
                 img = img.mirrored(True, False)
@@ -68,7 +73,12 @@ class Sprites:
             pm = QPixmap.fromImage(img)
             pm.setDevicePixelRatio(fisica / escala)
             self._cache[clave] = pm
+            while len(self._cache) > MAX_CACHE:
+                self._cache.popitem(last=False)
         return pm
+
+    def vaciar_cache(self):
+        self._cache.clear()
 
     def icono(self, escala=2):
         """Cara de la cobaya para la bandeja del sistema."""

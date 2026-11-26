@@ -15,7 +15,12 @@ Funciona en **Windows** (el objetivo principal), macOS y Linux (X11).
 2. Descarga **`Tamacuychi-instalador-X.Y.Z.exe`** y ábrelo.
 3. Si aparece "Windows protegió su PC", pulsa **Más información → Ejecutar de todas formas**
    (sale porque el programa no está firmado digitalmente).
-4. Elige si quieres acceso directo en el escritorio y que aparezca al encender el ordenador.
+4. Elige si quieres acceso directo en el escritorio.
+
+La cobaya **arranca sola al encender el ordenador** (se puede quitar en su menú:
+*Iniciar con Windows*). La primera vez pregunta cómo se llama. Si abres el
+programa cuando ya está en marcha, no sale otra: la que hay viene a la pantalla
+principal.
 
 No pide permisos de administrador: se instala en `%LOCALAPPDATA%\Programs\Tamacuychi`
 y se desinstala desde *Configuración → Aplicaciones*. Si no quieres instalar nada,
@@ -58,10 +63,10 @@ python tamacuychi.pyw --rapido
 | Clic en una **caca** | La recoge con destellos (+2 felicidad). |
 | Clic en el **bocadillo de lechuga** | Le das lechuga (+25 saciedad). |
 | Clic mientras **duerme** | Se despierta: sale del heno, se estira y bosteza. |
-| **Clic derecho** (o el icono de la bandeja) | Menú: lechuga, dormir/despertar, jugar, cui, recoger cacas, "ven aquí", tamaño, sonido, iniciar con Windows y salir. |
+| **Clic derecho** (o el icono de la bandeja) | Menú: lechuga, dormir/despertar, jugar, cui, recoger cacas, "ven aquí", nombre, tamaño (por defecto *Pequeña*), sonido, iniciar con Windows y salir. |
 
-Al pasar el ratón por encima aparecen tres barras: saciedad (naranja), felicidad
-(rosa) y energía (amarilla). Parpadean en rojo por debajo del 30 %.
+Al pasar el ratón por encima aparecen su nombre y tres barras: saciedad (naranja),
+felicidad (rosa) y energía (amarilla). Parpadean en rojo por debajo del 30 %.
 
 ### Qué no se come (por seguridad)
 
@@ -133,6 +138,18 @@ así que no importa que midan distinto.
 
 ![Sprites](art/sprites.png)
 
+## Memoria y CPU (pensado para equipos con poca RAM)
+
+- No carga QtMultimedia (unos 25 MB con FFmpeg): los sonidos van con `winsound`
+  en Windows y con `afplay`/`paplay` en el resto.
+- Dibuja a 60 fotogramas por segundo solo al saltar o caer; quieta, a 12, y
+  dormida, a 8. Las cacas se redibujan a 8 por segundo.
+- Los sprites escalados se guardan en una caché pequeña (48 como máximo).
+- En Windows, al terminar de arrancar y cada 30 minutos, devuelve al sistema la
+  memoria que ya no usa.
+- Medido en Linux: unos 59 MB en total, de los que unos 50 MB son Qt (una
+  ventana de Qt vacía ya ocupa eso). La versión 1.0 ocupaba unos 80 MB.
+
 ## Notas técnicas
 
 - **Qt (PySide6)**: ventana sin marco, siempre encima, transparente píxel a píxel y
@@ -140,6 +157,8 @@ así que no importa que midan distinto.
   pasar el ratón; en Linux X11 se usa una máscara con las zonas visibles.
 - **Pixel art nítido**: escalado entero en píxeles físicos, también con Windows al 125 % o 150 %.
 - **Sonido**: los WAV se generan la primera vez; en Windows se reproducen con `winsound`.
+- **Una sola instancia** (Windows): un mutex con nombre; la segunda copia avisa a
+  la primera con un evento para que venga y se cierra.
 - **Papelera**: `Send2Trash` (en Windows con `pywin32`, que además se niega a
   borrar si el archivo no cabe en la papelera).
 - **Wayland**: las ventanas no pueden moverse solas, así que en Linux se fuerza XWayland.

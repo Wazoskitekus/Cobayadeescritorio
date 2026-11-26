@@ -1,8 +1,7 @@
 """Sonidos sintetizados (equivale a src/sonido.cpp del firmware).
 
-Se generan como WAV la primera vez. En Windows se reproducen con winsound y en
-el resto con QSoundEffect. Si
-QtMultimedia no está disponible, la cobaya simplemente no suena.
+Se generan como WAV la primera vez. En Windows se reproducen con winsound; en
+macOS con afplay y en Linux con paplay/aplay. Si no hay reproductor, no suena.
 """
 
 import math
@@ -93,10 +92,13 @@ def puaj():
 
 
 class Sonidos:
+    """Reproduce los WAV sin cargar QtMultimedia (que se lleva unos 25 MB de RAM)."""
+
     def __init__(self):
-        self._efectos = {}
         self.silencio = False
         self._rutas = {}
+        self._proceso = None
+        self._reproductor = None
         carpeta = os.path.join(config.carpeta_datos(), "sonidos48")
         os.makedirs(carpeta, exist_ok=True)
         generar = {
@@ -111,32 +113,35 @@ class Sonidos:
                 except OSError:
                     continue
             self._rutas[nombre] = ruta
-        if sys.platform == "win32":
-            return          # en Windows se usa winsound, que no falla nunca
-        try:
-            from PySide6.QtCore import QUrl
-            from PySide6.QtMultimedia import QSoundEffect
-        except Exception:
-            return
-        for nombre, ruta in self._rutas.items():
-            ef = QSoundEffect()
-            ef.setSource(QUrl.fromLocalFile(ruta))
-            ef.setVolume(0.6)
-            self._efectos[nombre] = ef
+        if sys.platform != "win32":
+            import shutil
+            for prog in ("afplay", "paplay", "aplay", "pw-play"):
+                if shutil.which(prog):
+                    self._reproductor = prog
+                    break
 
     def tocar(self, nombre):
         if self.silencio:
             return
-        if sys.platform == "win32":
-            ruta = self._rutas.get(nombre)
-            if ruta:
-                import winsound
-                try:
-                    winsound.PlaySound(ruta, winsound.SND_FILENAME | winsound.SND_ASYNC
-                                       | winsound.SND_NODEFAULT)
-                except RuntimeError:
-                    pass
+        ruta = self._rutas.get(nombre)
+        if not ruta:
             return
-        ef = self._efectos.get(nombre)
-        if ef is not None:
-            ef.play()
+        if sys.platform == "win32":
+            # winsound: lo trae Python y no carga nada más
+            import winsound
+            try:
+                winsound.PlaySound(ruta, winsound.SND_FILENAME | winsound.SND_ASYNC
+                                   | winsound.SND_NODEFAULT)
+            except RuntimeError:
+                pass
+            return
+        if self._reproductor:
+            import subprocess
+            if self._proceso is not None and self._proceso.poll() is None:
+                self._proceso.terminate()
+            args = [self._reproductor, ruta] + (["-q"] if self._reproductor == "aplay" else [])
+            try:
+                self._proceso = subprocess.Popen(args, stdout=subprocess.DEVNULL,
+                                                 stderr=subprocess.DEVNULL)
+            except OSError:
+                self._reproductor = None

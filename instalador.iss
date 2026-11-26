@@ -34,7 +34,6 @@ Name: "es"; MessagesFile: "compiler:Languages\Spanish.isl"
 
 [Tasks]
 Name: "escritorio"; Description: "Crear un acceso directo en el escritorio"; GroupDescription: "Accesos directos:"
-Name: "inicio"; Description: "Que la cobaya aparezca al encender el ordenador"; GroupDescription: "Arranque:"
 
 [Files]
 Source: "dist\Tamacuychi\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -45,8 +44,8 @@ Name: "{group}\Desinstalar Tamacuychi"; Filename: "{uninstallexe}"
 Name: "{userdesktop}\Tamacuychi"; Filename: "{app}\Tamacuychi.exe"; Tasks: escritorio
 
 [Registry]
-; El mismo valor que activa el menú "Iniciar con Windows" del programa
-Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "Tamacuychi"; ValueData: """{app}\Tamacuychi.exe"""; Flags: uninsdeletevalue; Tasks: inicio
+; Arranca con Windows (se puede quitar en el menú de la cobaya: "Iniciar con Windows")
+Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "Tamacuychi"; ValueData: """{app}\Tamacuychi.exe"""; Flags: uninsdeletevalue
 
 [Run]
 Filename: "{app}\Tamacuychi.exe"; Description: "Abrir Tamacuychi ahora"; Flags: nowait postinstall skipifsilent
@@ -56,3 +55,14 @@ Filename: "{sys}\taskkill.exe"; Parameters: "/F /IM Tamacuychi.exe"; Flags: runh
 
 [UninstallDelete]
 Type: filesandordirs; Name: "{userappdata}\Tamacuychi\sonidos48"
+
+[Code]
+// Al actualizar, cierra la cobaya que esté abierta para poder sustituir los archivos
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+var
+  Codigo: Integer;
+begin
+  Exec(ExpandConstant('{sys}\taskkill.exe'), '/F /IM Tamacuychi.exe', '', SW_HIDE,
+       ewWaitUntilTerminated, Codigo);
+  Result := '';
+end;

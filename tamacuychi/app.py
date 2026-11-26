@@ -53,10 +53,59 @@ def inicio_windows(activar):
                 pass
 
 
+# ---------------------------------------------------------------------------
+# Una sola cobaya a la vez (Windows): si ya hay una, se la avisa para que venga
+# ---------------------------------------------------------------------------
+_MUTEX = "Local\\TamacuychiMutex"       # también lo usa instalador.iss (AppMutex)
+_EVENTO = "Local\\TamacuychiVenAqui"
+
+
+class _Instancia:
+    def __init__(self):
+        self.evento = None
+        if sys.platform != "win32":
+            self.primera = True
+            return
+        import ctypes
+        k32 = ctypes.windll.kernel32
+        k32.CreateMutexW.restype = ctypes.c_void_p
+        k32.CreateEventW.restype = ctypes.c_void_p
+        self._k32 = k32
+        self._mutex = k32.CreateMutexW(None, False, _MUTEX)
+        self.primera = k32.GetLastError() != 183          # ERROR_ALREADY_EXISTS
+        self.evento = k32.CreateEventW(None, False, False, _EVENTO)
+        if not self.primera and self.evento:
+            k32.SetEvent(ctypes.c_void_p(self.evento))
+
+    def la_llaman(self):
+        if not self.evento:
+            return False
+        import ctypes
+        return self._k32.WaitForSingleObject(ctypes.c_void_p(self.evento), 0) == 0
+
+
+def liberar_memoria():
+    """Devuelve a Windows la memoria que ya no se está usando."""
+    import gc
+    gc.collect()
+    if sys.platform == "win32":
+        try:
+            import ctypes
+            k32 = ctypes.windll.kernel32
+            k32.GetCurrentProcess.restype = ctypes.c_void_p
+            k32.K32EmptyWorkingSet(ctypes.c_void_p(k32.GetCurrentProcess()))
+        except (AttributeError, OSError):
+            pass
+
+
 def main():
     _preparar_entorno()
+    instancia = _Instancia()
+    if not instancia.primera:
+        return 0           # ya hay una cobaya: le hemos pedido que venga y salimos
+    from PySide6.QtCore import QTimer
     from PySide6.QtGui import QActionGroup, QGuiApplication, QIcon
-    from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
+    from PySide6.QtWidgets import QApplication, QInputDialog, QMenu, QSystemTrayIcon
 
     from .mascota import Mascota
     from .sonido import Sonidos
@@ -74,6 +123,33 @@ def main():
     cobaya = Cobaya(mascota, sprites, sonidos)
     icono = QIcon(sprites.icono(2))
     app.setWindowIcon(icono)
+    bandeja = None
+
+    def actualizar_nombre():
+        nombre = mascota.nombre or "Tamacuychi"
+        cobaya.setWindowTitle(nombre)
+        if bandeja is not None:
+            bandeja.setToolTip(nombre)
+
+    def poner_nombre():
+        nombre, ok = QInputDialog.getText(None, "Tamacuychi", "¿Cómo se llama tu cobaya?",
+                                          text=mascota.nombre)
+        mascota.nombre_preguntado = True
+        if ok:
+            mascota.nombre = nombre.strip()[:24]
+            cobaya.decir((mascota.nombre + "!") if mascota.nombre else "cui!", dur=2.5)
+            cobaya.mostrar_barras(3)
+        mascota.guardar()
+        actualizar_nombre()
+
+    # La primera vez, la cobaya se apunta sola al inicio de Windows
+    if sys.platform == "win32" and not mascota.inicio_configurado:
+        try:
+            inicio_windows(True)
+        except OSError as e:
+            print("No se pudo activar el inicio con Windows:", e, file=sys.stderr)
+        mascota.inicio_configurado = True
+        mascota.guardar()
 
     def salir():
         cobaya.cerrar()
@@ -91,6 +167,9 @@ def main():
             return a
 
         durmiendo = cobaya.estado in (DURMIENDO, YENDO_A_DORMIR, DESPERTANDO)
+        if m.nombre:
+            titulo = menu.addAction("🐹  " + m.nombre)
+            titulo.setEnabled(False)
         info = menu.addAction("Saciedad %d%%  ·  Felicidad %d%%  ·  Energía %d%%"
                               % (m.saciedad, m.felicidad, m.energia))
         info.setEnabled(False)
@@ -108,6 +187,7 @@ def main():
         accion("🧹  Recoger cacas (%d)" % len(cobaya.cacas), cobaya.recoger_cacas, bool(cobaya.cacas))
         accion("📍  Ven aquí", cobaya.llamar, not durmiendo)
         menu.addSeparator()
+        accion("✏  Ponerle nombre…" if not m.nombre else "✏  Cambiar el nombre…", poner_nombre)
 
         tam = menu.addMenu("Tamaño")
         grupo = QActionGroup(tam)
@@ -136,8 +216,6 @@ def main():
             def cambiar_inicio(activo):
                 try:
                     inicio_windows(activo)
-                    m.inicio_windows = activo
-                    m.guardar()
                 except OSError as e:
                     print("No se pudo cambiar el inicio con Windows:", e, file=sys.stderr)
             ini.toggled.connect(cambiar_inicio)
@@ -149,10 +227,8 @@ def main():
     menu_contextual = QMenu()
     cobaya.menu_fn = lambda: construir_menu(menu_contextual)
 
-    bandeja = None
     if QSystemTrayIcon.isSystemTrayAvailable():
         bandeja = QSystemTrayIcon(icono)
-        bandeja.setToolTip("Tamacuychi")
         menu_bandeja = QMenu()
         menu_bandeja.aboutToShow.connect(lambda: construir_menu(menu_bandeja))
         construir_menu(menu_bandeja)
@@ -161,12 +237,29 @@ def main():
             lambda motivo: cobaya.llamar() if motivo == QSystemTrayIcon.Trigger else None)
         bandeja.show()
 
+    actualizar_nombre()
     cobaya.show()
     app.aboutToQuit.connect(lambda: mascota.guardar())
-    # Ctrl+C en la consola cierra guardando
-    signal.signal(signal.SIGINT, lambda *_: salir())
-    from PySide6.QtCore import QTimer
+
+    # Si se vuelve a abrir el programa, la cobaya que ya está viene
+    llamada = QTimer()
+    llamada.timeout.connect(lambda: cobaya.llamar() if instancia.la_llaman() else None)
+    if instancia.evento:
+        llamada.start(1000)
+
+    if not mascota.nombre_preguntado:
+        QTimer.singleShot(1500, poner_nombre)
+
+    # Memoria: al terminar de arrancar y cada 30 minutos
+    QTimer.singleShot(8000, liberar_memoria)
+    limpieza = QTimer()
+    limpieza.timeout.connect(liberar_memoria)
+    limpieza.start(30 * 60 * 1000)
+
     latido = QTimer()
-    latido.timeout.connect(lambda: None)   # deja que Python atienda las señales
-    latido.start(300)
+    if sys.platform != "win32":
+        # Ctrl+C en la consola cierra guardando
+        signal.signal(signal.SIGINT, lambda *_: salir())
+        latido.timeout.connect(lambda: None)   # deja que Python atienda las señales
+        latido.start(500)
     return app.exec()

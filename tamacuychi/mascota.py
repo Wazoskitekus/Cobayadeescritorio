@@ -10,6 +10,7 @@ from . import config
 
 HORA = 3600.0
 MAX_CACAS = 4
+ESCALA_DEFECTO = 2         # "Pequeña"
 MAX_AUSENCIA = 12 * HORA   # lo que se tiene en cuenta del tiempo con el programa cerrado
 
 
@@ -29,9 +30,11 @@ class Mascota:
         self.caca_tras_comer = None
         self.archivos_comidos = 0
         self.silencio = False
-        self.escala = 4
+        self.escala = ESCALA_DEFECTO
+        self.nombre = ""
+        self.nombre_preguntado = False
         self.posicion = None       # [x, y] del centro de los pies
-        self.inicio_windows = False
+        self.inicio_configurado = False   # la primera vez se activa el inicio con Windows
         self._ultimo = ahora()
         self._ruta = os.path.join(config.carpeta_datos(), "estado.json")
         self.cargar()
@@ -136,11 +139,12 @@ class Mascota:
 
     # -- guardado ---------------------------------------------------------
     _CAMPOS = ("saciedad", "felicidad", "energia", "durmiendo", "cacas", "prox_caca",
-               "caca_tras_comer", "archivos_comidos", "silencio", "escala", "posicion",
-               "inicio_windows")
+               "caca_tras_comer", "archivos_comidos", "silencio", "posicion",
+               "nombre", "nombre_preguntado", "inicio_configurado")
 
     def guardar(self):
         datos = {k: getattr(self, k) for k in self._CAMPOS}
+        datos["tamano"] = self.escala    # "escala" era el tamaño de la 1.0 (ya no se lee)
         datos["ultimo_real"] = time.time()
         tmp = self._ruta + ".tmp"
         try:
@@ -159,6 +163,8 @@ class Mascota:
         for k in self._CAMPOS:
             if k in datos:
                 setattr(self, k, datos[k])
+        self.escala = datos.get("tamano", ESCALA_DEFECTO)
+        self.nombre = str(self.nombre or "")[:24]
         # el tiempo con el programa cerrado también cuenta (con tope)
         if "ultimo_real" in datos:
             fuera = max(0.0, time.time() - float(datos["ultimo_real"])) * config.VELOCIDAD_TIEMPO
@@ -170,5 +176,8 @@ class Mascota:
         if self.caca_tras_comer is not None and abs(self.caca_tras_comer - t) > 2 * HORA:
             self.caca_tras_comer = None
         self.cacas = [list(c) for c in self.cacas][:MAX_CACAS]
-        self.escala = int(self.escala) if int(self.escala) in (2, 3, 4, 5, 6) else 4
+        try:
+            self.escala = int(self.escala) if int(self.escala) in (2, 3, 4, 5, 6) else ESCALA_DEFECTO
+        except (TypeError, ValueError):
+            self.escala = ESCALA_DEFECTO
         self._limitar()

@@ -62,7 +62,7 @@ class Cobaya(QWidget):
         self.m, self.spr, self.snd = mascota, sprites, sonidos
         self.snd.silencio = self.m.silencio
         self.e = self.m.escala
-        self.setFixedSize(WA * self.e, HA * self.e)
+        self._ajustar_tamano()
         self.menu_fn = None            # lo pone app.py
         self._mascara_x11 = QGuiApplication.platformName() == "xcb"
         self._ultima_mascara = None
@@ -111,6 +111,7 @@ class Cobaya(QWidget):
 
         self._t_ant = time.monotonic()
         self._t_stats = 0.0
+        self._t_cacas = 0.0
         self._t_guardar = time.monotonic()
         self.timer = QTimer(self)
         self.timer.timeout.connect(self._tick)
@@ -160,7 +161,8 @@ class Cobaya(QWidget):
 
     def cambiar_escala(self, e):
         self.e = self.m.escala = e
-        self.setFixedSize(WA * e, HA * e)
+        self.spr.vaciar_cache()
+        self._ajustar_tamano()
         self.px = min(max(self.px, self._limites_x()[0]), self._limites_x()[1])
         self._colocar()
         for c in list(self.cacas):
@@ -169,6 +171,14 @@ class Cobaya(QWidget):
             self.cacas.remove(c)
             self._crear_caca_ventana(x, y)
         self.m.guardar()
+
+    def _ajustar_tamano(self):
+        # los textos no se encogen con la cobaya: en tamaños pequeños hace falta más alto
+        extra = 34 if self.e <= 3 else 0
+        self.setFixedSize(WA * self.e, HA * self.e + extra)
+
+    def mostrar_barras(self, segundos):
+        self._barras_hasta = time.monotonic() + segundos
 
     def llamar(self):
         """Aparece cayendo desde arriba en la pantalla principal."""
@@ -196,7 +206,7 @@ class Cobaya(QWidget):
 
     def _tick(self):
         ahora = time.monotonic()
-        dt = min(0.05, ahora - self._t_ant)
+        dt = min(0.25, ahora - self._t_ant)
         self._t_ant = ahora
         self.t_estado += dt
 
@@ -220,11 +230,23 @@ class Cobaya(QWidget):
         self._particulas_avanzar(dt)
         if self._bocadillo and ahora > self._bocadillo["hasta"]:
             self._bocadillo = None
-        for c in list(self.cacas):
-            c.avanzar()
+        if ahora - self._t_cacas >= 0.12:
+            self._t_cacas = ahora
+            for c in list(self.cacas):
+                c.avanzar()
 
-        rapido = self.estado in (POPCORN, CAYENDO, COGIDA, ANDAR) or bool(self._particulas)
-        self.timer.setInterval(16 if rapido else 33)
+        # Cuantos menos fotogramas, menos CPU: 60 por segundo solo al saltar o caer
+        est = self.estado
+        if est in (POPCORN, CAYENDO, COGIDA):
+            intervalo = 16
+        elif est == DURMIENDO:
+            intervalo = 120
+        elif est == ANDAR or self._particulas or est not in (REPOSO, CUI):
+            intervalo = 40
+        else:
+            intervalo = 80
+        if self.timer.interval() != intervalo:
+            self.timer.setInterval(intervalo)
         self._colocar()
         self.update()
 
@@ -436,7 +458,7 @@ class Cobaya(QWidget):
     def _nuevo_salto(self):
         g = self._pantalla()
         lo, hi = self._limites_x()
-        e4 = self.e / 4
+        e4 = max(self.e / 4, 0.8)   # en tamaño pequeño también salta lejos
         dx = random.uniform(70, 340) * e4 * random.choice((-1, 1))
         if not lo <= self.px + dx <= hi:
             dx = -dx
@@ -488,6 +510,12 @@ class Cobaya(QWidget):
         self.px, self.py = float(nx), float(ny)
 
     def _act_cayendo(self, dt, ahora):
+        while dt > 0 and self.estado == CAYENDO:
+            paso = min(dt, 0.02)
+            dt -= paso
+            self._caer(paso)
+
+    def _caer(self, dt):
         g = self._pantalla()
         self.vy += 2600 * dt
         self.vx *= (1 - 0.8 * dt)
@@ -739,7 +767,7 @@ class Cobaya(QWidget):
                 p.fillRect(r, q["color"])
             else:
                 nombre = {"corazon": "corazon", "zeta": "zeta"}[q["tipo"]]
-                esc = e if q["tipo"] == "corazon" else max(1, e - 1)
+                esc = e if q["tipo"] == "corazon" else max(2, e - 1)
                 pm = self.spr.get(nombre, 0, esc)
                 w, h = tam(pm)
                 r = QRect(int(q["x"] - w / 2), int(q["y"] - h / 2), w, h)
@@ -752,7 +780,7 @@ class Cobaya(QWidget):
             zonas.append(self._pintar_bocadillo(p, W, H, pose))
 
         # barras de estado al pasar el ratón
-        if self._hover or time.monotonic() < self._barras_hasta:
+        if self._barras_visibles():
             zonas.append(self._pintar_barras(p, W))
         p.end()
 
@@ -814,6 +842,7 @@ class Cobaya(QWidget):
             f = self._fuente()
             p.setFont(f)
             fm = QFontMetrics(f)
+            texto = fm.elidedText(texto, Qt.ElideMiddle, W - 6 * e - 2)
             cw, ch = fm.horizontalAdvance(texto), fm.height()
         pad = 2 * e
         bw = min(W - 2 * e, cw + 2 * pad)
@@ -825,7 +854,7 @@ class Cobaya(QWidget):
         if self.estado == DURMIENDO:
             alto_cobaya = (FONDO + 30) * e
         bx = int(W / 2 - bw / 2)
-        by = int(max(10 * e, H - alto_cobaya - bh - 4 * e))
+        by = int(max(self._alto_barras() + 2, H - alto_cobaya - bh - 4 * e))
         blanco = QColor(255, 255, 255)
         # cuerpo con esquinas recortadas (estilo pixel)
         p.fillRect(QRect(bx + e, by, bw - 2 * e, bh), COL_CONTORNO)
@@ -848,12 +877,46 @@ class Cobaya(QWidget):
         self._rect_bocadillo = QRect(bx, by, bw, bh)
         return QRect(bx, by, bw, bh + 2 * e)
 
+    def _barras_visibles(self):
+        return self._hover or time.monotonic() < self._barras_hasta
+
+    def _fuente_nombre(self):
+        f = QFont()
+        f.setPixelSize(max(11, int(3.2 * self.e)))
+        f.setBold(True)
+        f.setStyleStrategy(QFont.NoAntialias)
+        return f
+
+    def _alto_barras(self):
+        if not self._barras_visibles():
+            return 0
+        u = max(self.e, 3)
+        alto = 1 + 9 * u
+        if self.m.nombre:
+            alto += QFontMetrics(self._fuente_nombre()).height()
+        return alto
+
     def _pintar_barras(self, p, W):
-        e = self.e
+        e = max(self.e, 3)       # las barras no se hacen diminutas en tamaño pequeño
         parpadeo = int(time.monotonic() * 4) % 2 == 0
         ancho = 24 * e
         x0 = int(W / 2 - ancho / 2)
-        y = e
+        y = 1
+        if self.m.nombre:
+            f = self._fuente_nombre()
+            fm = QFontMetrics(f)
+            texto = fm.elidedText(self.m.nombre, Qt.ElideRight, W - 4)
+            tw, th = fm.horizontalAdvance(texto), fm.height()
+            p.setFont(f)
+            # contorno de 1 px para que se lea sobre cualquier fondo
+            p.setPen(COL_CONTORNO)
+            tx = int(W / 2 - tw / 2)
+            for dx, dy in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+                p.drawText(tx + dx, y + fm.ascent() + dy, texto)
+            p.setPen(QColor(255, 255, 255))
+            p.drawText(tx, y + fm.ascent(), texto)
+            y += th
+        y0 = y
         for valor, col in ((self.m.saciedad, COL_SACIEDAD), (self.m.felicidad, COL_FELICIDAD),
                            (self.m.energia, COL_ENERGIA)):
             if valor < 30 and parpadeo:
@@ -863,7 +926,7 @@ class Cobaya(QWidget):
             lleno = int((ancho - 2 * e) * valor / 100.0)
             p.fillRect(QRect(x0 + e, y + e, lleno, e), col)
             y += 3 * e
-        return QRect(x0, e, ancho, 9 * e)
+        return QRect(0, 0, W, y0 + 9 * e)
 
     # ------------------------------------------------------------------
     # Ratón

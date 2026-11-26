@@ -26,12 +26,25 @@ empiezas una conversación nueva, adjunta este archivo y di en qué quieres segu
   contorno automático, y ojos y boca como sellos. Vista de frente (33×30), de
   perfil para andar (38×26) y de espaldas. Los PNG de `sprites/` sustituyen al
   arte generado, así que valen los del firmware.
-- **Escala**: entera (2 a 6, por defecto 4) y en píxeles físicos.
+- **Escala**: entera (2 a 6, por defecto 2) y en píxeles físicos.
 - **Papelera**: `Send2Trash`, solo archivos sueltos, como mucho 2 GB y, en
   Windows, solo de discos fijos. Al soltar se responde siempre "copiar".
 - **Sonido**: la partitura del firmware (barridos con armónico) sintetizada a WAV
-  de 48 kHz; `winsound` en Windows y `QSoundEffect` en el resto.
+  de 48 kHz; `winsound` en Windows y `afplay`/`paplay` en el resto.
 - **Mismas cifras que el firmware** en desgaste, cacas, cui y descuido.
+
+## Versión 1.1
+
+- Tamaño por defecto *Pequeña* (escala 2). Se guarda como `tamano` en
+  `estado.json` (la 1.0 guardaba `escala` siempre, así que se ignora).
+- Nombre: se pregunta la primera vez y se cambia en el menú; sale encima de las
+  barras, en el menú y en el icono de la bandeja.
+- Arranca con Windows: el instalador lo activa siempre y el programa lo activa la
+  primera vez que se abre (`inicio_configurado`); se quita en el menú.
+- Una sola instancia (mutex `Local\TamacuychiMutex`); abrirlo otra vez trae la cobaya.
+- Poca RAM: sin QtMultimedia, menos fotogramas en reposo, caché de sprites
+  limitada y recorte de memoria en Windows. Unos 59 MB (Qt solo ya son unos 50).
+- El instalador cierra la cobaya abierta antes de actualizar.
 
 ## Comportamiento
 
